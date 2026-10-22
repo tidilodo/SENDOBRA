@@ -1,0 +1,8 @@
+# Copiar valores localmente para .env, nunca enviar segredos no chat.
+WHATSAPP_DISCOVERY_ONLY=1
+SENDOBRA_SITE_URL=https://sendobra-pst.bergsonchatgpt.chatgpt.site
+WHATSAPP_INGEST_SECRET=
+SITES_SERVICE_TOKEN=
+WHATSAPP_ALLOWED_GROUP_ID=
+WHATSAPP_SEND_REPLIES=0
+PAIRING_PORT=8790

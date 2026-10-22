@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';import {createHmac} from 'node:crypto';
+const base='http://127.0.0.1:8787',headers={'oai-authenticated-user-id':'qa-owner','oai-authenticated-user-email':'qa@local.test',Origin:base,'Content-Type':'application/json'};
+async function admin(path,b){const r=await fetch(base+path,{method:b?'POST':'GET',headers,body:b?JSON.stringify(b):undefined,signal:AbortSignal.timeout(20000)});return {status:r.status,data:await r.json()};}
+async function event(e,{secret='fixture-not-a-live-secret',time=String(Date.now())}={}){const raw=JSON.stringify(e),signature='v1='+createHmac('sha256',secret).update(time+'.'+raw).digest('hex');const r=await fetch(base+'/api/whatsapp',{method:'POST',headers:{'Content-Type':'application/json','x-sendobra-timestamp':time,'x-sendobra-signature':signature},body:raw,signal:AbortSignal.timeout(20000)});return {status:r.status,data:await r.json()};}
+const initial=await admin('/api/data');assert.equal(initial.status,200);const project=initial.data.projects[0].id,group='123456789@g.us',sender='5511999999999@s.whatsapp.net';
+assert.equal((await admin('/api/whatsapp-config',{action:'group',group,project,active:true})).status,200);
+assert.equal((await admin('/api/whatsapp-config',{action:'sender',sender,user:'qa-owner'})).status,200);
+const e={id:'test-'+Date.now(),group,sender,kind:'text',text:'/despesa 10,50 | 2026-10-22 | QA WhatsApp local',timestamp:Date.now()};
+assert.equal((await event(e,{secret:'wrong'})).status,401);assert.equal((await event(e,{time:String(Date.now()-400000)})).status,401);assert.equal((await event({...e,group:'999999999@g.us'})).status,403);assert.equal((await event({...e,sender:'5511888888888@s.whatsapp.net'})).status,403);
+const created=await event(e);assert.equal(created.status,200);assert.equal(created.data.status,'approved');const duplicate=await event(e);assert.equal(duplicate.data.duplicate,true);assert.equal(duplicate.data.record,created.data.record);
+const incomplete=await event({...e,id:e.id+'-question',text:'comprei cimento'});assert.equal(incomplete.data.status,'awaiting_clarification');assert.equal(incomplete.data.record,null);assert.ok(incomplete.data.reply);
+const audio=await event({...e,id:e.id+'-audio',kind:'audio',text:''});assert.equal(audio.data.record,null);assert.equal(audio.data.status,'awaiting_clarification');
+const heartbeat=await event({event:'connection',state:'connected'});assert.equal(heartbeat.status,200);const cfg=await admin('/api/whatsapp-config');assert.equal(cfg.data.connection.state,'connected');assert.ok(cfg.data.messages.length>=3);
+const state=await admin('/api/data');assert.equal(state.data.records.filter(r=>r.id===created.data.record).length,1);assert.equal(state.data.records.find(r=>r.id===created.data.record).amount,1050);
+const simultaneous={...e,id:e.id+'-race'};const race=await Promise.all([event(simultaneous),event(simultaneous)]);assert.equal(race.filter(r=>r.data.duplicate).length,1);assert.equal(race[0].data.record,race[1].data.record);
+console.log('PASS: Worker+D1: configuração, HMAC, replay, grupo, remetente, lançamento, deduplicação sequencial/concorrente, esclarecimento, mídia não processada, heartbeat e auditoria. Somente dados locais.');

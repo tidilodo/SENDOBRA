@@ -1,0 +1,1 @@
+{"name":"sendobra-whatsapp-pilot","private":true,"type":"module","scripts":{"start":"node --env-file-if-exists=.env index.mjs","test":"node --test test.mjs"},"dependencies":{"@whiskeysockets/baileys":"6.7.24","qrcode":"1.5.4"}}
