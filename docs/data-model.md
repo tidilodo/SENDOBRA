@@ -1,0 +1,2 @@
+# Dados
+users: identidade Sites, e-mail único, cargo, ativo, obras autorizadas em JSON. projects: código único, endereço e estado. records: autor/obra por chave estrangeira, tipo, categoria, fornecedor, centavos, data, aprovação e pagamento separados. attachments: referência, hash e metadados; bytes no R2. audit: ator, ação, antes/depois e horário UTC. suppliers e categories configuráveis. Sem seeds empresariais. A organização é isolada pelo Site. Datas operacionais YYYY-MM-DD, auditoria ISO UTC e apresentação America/Sao_Paulo.

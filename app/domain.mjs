@@ -1,0 +1,3 @@
+export function money(value) { if(!/^\d{1,10}(,\d{1,2})?$/.test(String(value))) throw Error('Informe um valor válido, com vírgula e até duas casas.'); const [a,b='']=String(value).split(',');const cents=Number(a)*100+Number(b.padEnd(2,'0'));if(cents<=0)throw Error('O valor deve ser positivo.');return cents; }
+export function canProject(user,id){return user.role==='owner'||JSON.parse(user.projects).includes(id);}
+export function canReview(user,record,author){return user.id!==record.author&&canProject(user,record.project)&&(user.role==='owner'||(user.role==='manager'&&['employee','foreman'].includes(author.role)));}
