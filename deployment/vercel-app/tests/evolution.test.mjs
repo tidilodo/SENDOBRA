@@ -19,8 +19,14 @@ test('media metadata never masquerades as a transcribed or decoded file', () => 
 test('rejects invalid secret, oversized input and stale events without upstream calls',async()=>{
  const noFetch=()=>{throw Error('Must not call');};
  assert.equal((await receiveEvolution(request(sample()),'bad',config,noFetch)).status,401);
- assert.equal((await receiveEvolution(request({padding:'x'.repeat(270000)}),config.key,config,noFetch)).status,413);
+ assert.equal((await receiveEvolution(request({padding:'x'.repeat(2100000)}),config.key,config,noFetch)).status,413);
  const stale=sample();stale.data.messageTimestamp=1;assert.equal((await receiveEvolution(request(stale),config.key,config,noFetch)).status,400);
+});
+test('maps the provider alternate LID only to an existing authorized sender', () => {
+ const b=sample(), e=normalizeEvolution(b,config);
+ const native={event:'Message',instanceName:'tidi',data:{Info:{ID:e.id,Chat:e.group,Sender:'5511999999999@s.whatsapp.net',SenderAlt:e.sender,IsFromMe:false,Timestamp:new Date(e.timestamp).toISOString()},Message:{conversation:e.text}}};
+ assert.deepEqual(normalizeEvolution(native,config),e);
+ native.data.Info.SenderAlt='999999@lid';assert.equal(normalizeEvolution(native,config),null);
 });
 test('signs delivery and only acknowledges confirmed backend persistence, including duplicates',async()=>{
  const mock=async(url,options)=>{assert.equal(url.href,'https://backend.example/api/whatsapp');const h=options.headers;assert.equal(h['X-Sendobra-Signature'],'v1='+createHmac('sha256',config.secret).update(h['X-Sendobra-Timestamp']+'.'+options.body).digest('hex'));assert.equal(h['OAI-Sites-Authorization'],'Bearer fixture-service');assert.equal(options.redirect,'error');return Response.json({ok:true,duplicate:true});};

@@ -13,6 +13,7 @@ async function webhook(request: Request, context: {params: Promise<{key: string}
     secret: process.env.WHATSAPP_INGEST_SECRET,
     serviceToken: process.env.BRIDGE_SERVICE_TOKEN,
     site: process.env.BRIDGE_BACKEND_URL,
+    report: (detail: Record<string, unknown>) => console.info('evolution_ingest', JSON.stringify(detail)),
   });
 }
 export const POST = webhook;
