@@ -19,3 +19,14 @@ Sessão e fila ficam fora do repositório em ~/.sendobra/whatsapp-pilot. Contêm
 
 Limites: sem áudio/OCR/IA, sem reprocessamento administrativo na interface, sem restauração certificada. Nenhuma conexão real pode ser afirmada antes do pareamento/teste. Computador deve permanecer ligado durante o piloto. Não há hospedagem externa contratada.
 `n## Descoberta local do grupo antes de configurar o servidor`nApós criar exatamente o grupo SENDOBRA · Teste, definir WHATSAPP_DISCOVERY_ONLY=1 em .env e executar npm start. Nesse modo não são exigidos segredos de backend, não há encaminhamento nem envio de mensagens. Parear pelo QR local e atualizar a página; apenas o ID do grupo com esse nome será exibido. Outros nomes de grupos não são exibidos ou enviados. Parar com Ctrl+C após copiar o ID. Não é necessário compartilhar o QR no chat.
+
+## Áudio com Alquimia Audio Engine
+O motor existente fica em C:/Users/Utilizador/vault/projetos/alquimia-audio-engine. O conector usa POST /api/v1/jobs com audio_file, language=pt e Idempotency-Key, seguido de GET do job. A chave Groq permanece no motor; o conector recebe somente a chave de acesso da API do motor por variável de ambiente.
+
+Configurar AUDIO_ENGINE_URL, AUDIO_ENGINE_API_KEY e WHATSAPP_AUDIO_ALLOWED_SENDERS (JIDs exatos separados por vírgula), além das credenciais de ingestão existentes. HTTP é aceito somente em loopback; servidores remotos exigem HTTPS. Manter a lista local de remetentes sincronizada com as permissões do painel; ela limita o envio de áudio ao motor, e o backend também valida o vínculo antes de salvar o evento.
+
+Piloto: somente audio/ogg, até 10 MB e duração declarada de até 120 segundos, com no máximo três transcrições simultâneas. A duração é declarada pelo WhatsApp, não uma inspeção confiável do conteúdo. O download tem limite de bytes e timeout. Os bytes não são gravados pelo conector; o motor usa arquivo temporário e o remove após processar. Resultado de até 4.000 caracteres; falha, resultado vazio ou longo vira evento sem transcrição. O áudio não vira comando financeiro: fica como audio/awaiting_clarification com o texto para revisão em Configurações > WhatsApp > Eventos recentes. Respostas permanecem desligadas.
+
+Limitações: transcrições em andamento não têm fila durável; encerramento do conector durante o download/transcrição pode perder esse evento. A idempotência dos jobs do motor é em memória e não sobrevive ao reinício do motor. A confirmação final de áudio real pelo grupo ainda depende do conector ativo, das credenciais de runtime e de um teste ponta a ponta.
+
+Os trechos anteriores que dizem “sem áudio” descrevem a versão anterior. Imagem, documento, interpretação de negócio e lançamento automático por áudio continuam fora desta integração.

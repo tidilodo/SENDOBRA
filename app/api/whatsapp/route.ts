@@ -1,6 +1,6 @@
 import {env} from 'cloudflare:workers';
 import {canProject} from '../../domain.mjs';
-import {validateEvent,parseText,verifySignature} from '../../whatsapp-domain.mjs';
+import {validateEvent,parseEvent,verifySignature} from '../../whatsapp-domain.mjs';
 export const dynamic='force-dynamic';
 const json=(b:any,s=200)=>Response.json(b,{status:s,headers:{'Cache-Control':'no-store'}});
 export async function POST(r:Request){
@@ -14,7 +14,7 @@ export async function POST(r:Request){
  const e=validateEvent(b);const group:any=await db.prepare('SELECT * FROM whatsapp_groups WHERE id=? AND active=1').bind(e.group).first();if(!group)return json({error:'Grupo não autorizado'},403);
  const u:any=await db.prepare('SELECT users.* FROM users JOIN whatsapp_senders ON users.id=whatsapp_senders.user WHERE whatsapp_senders.id=? AND users.active=1').bind(e.sender).first();if(!u||!canProject(u,group.project))return json({error:'Remetente não autorizado para esta obra'},403);
  const messageId=e.group+':'+e.id;const existing:any=await db.prepare('SELECT status, record_id, question FROM whatsapp_messages WHERE id=?').bind(messageId).first();if(existing)return json({ok:true,duplicate:true,status:existing.status,record:existing.record_id});
- const parsed:any=e.kind==='text'?parseText(e.text):{question:'Mídia recebida como evento, mas processamento de áudio, imagem e documento ainda não está disponível. Envie os dados em texto. Nenhum arquivo foi armazenado.'};
+ const parsed:any=parseEvent(e);
  const status=parsed.question?'awaiting_clarification':(['owner','manager'].includes(u.role)?'approved':'pending_approval');
  const recordId=parsed.question?null:crypto.randomUUID(),correlation=crypto.randomUUID();
  const q=[db.prepare('INSERT INTO whatsapp_messages VALUES(?,?,?,?,?,?,?,?,?)').bind(messageId,e.group,e.sender,e.kind,status,recordId,now,parsed.question||null,correlation)];

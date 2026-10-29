@@ -18,3 +18,6 @@ GitHub Actions verifica padrões conhecidos de segredos, testes de domínio e Wh
 Execute os testes com `node --test tests/domain.test.mjs tests/whatsapp.test.mjs adapter/test.mjs` e TypeScript com `node node_modules/typescript/bin/tsc --noEmit`.
 
 Não há implantação automática configurada. Backup e restauração, permissões e comprovantes precisam de validação completa antes de operação financeira real.
+
+## Integração de áudio (preparação em 28/10/2026)
+Cliente do Alquimia Audio Engine integrado ao conector, com lista explícita de remetentes e transcrição para revisão sem lançamento. Motor existente validado novamente: cinco testes de contrato e uma transcrição real de amostra sintética concluída. O teste pelo grupo permanece pendente até ativação do conector com o runtime correto. Consulte adapter/README.md.

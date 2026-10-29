@@ -24,3 +24,9 @@ export async function verifySignature(secret,raw,timestamp,signature,now=Date.no
  const bytes=Uint8Array.from(signature.slice(3).match(/../g).map(h=>parseInt(h,16)));
  return crypto.subtle.verify('HMAC',key,bytes,new TextEncoder().encode(timestamp+'.'+raw));
 }
+
+export function parseEvent(e){
+ if(e.kind==='text')return parseText(e.text);
+ if(e.kind==='audio')return {question:e.text.trim()?'Áudio transcrito — aguardando revisão. Nenhum lançamento criado.\n'+e.text:'Áudio recebido sem transcrição disponível. Reenvie os dados em texto. Nenhum lançamento criado.'};
+ return {question:'Mídia recebida; processamento de imagem e documento ainda não disponível. Envie os dados em texto. Nenhum arquivo armazenado.'};
+}
