@@ -13,7 +13,6 @@ export default function TestInbox({records=[]}:{records?:any[]}){
  useEffect(()=>{load();const timer=setInterval(load,15000);return()=>clearInterval(timer);},[]);
  function select(value:Mode){M(value);T(false);}
  function tabKeys(e:React.KeyboardEvent<HTMLButtonElement>,index:number){if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?2:(index+(e.key==='ArrowRight'?1:2))%3;select(modes[next].id);(e.currentTarget.parentElement?.querySelectorAll('button')[next] as HTMLButtonElement)?.focus();}
- const selected=modes.find(m=>m.id===mode)!;
  return <div className="client-demo">
  <div className="demo-view-nav" aria-label="Conteúdo da apresentação"><button className={view==='examples'?'is-current':''} aria-pressed={view==='examples'} onClick={()=>V('examples')}>Conheça o fluxo</button><button className={view==='received'?'is-current':''} aria-pressed={view==='received'} onClick={()=>V('received')}>Mensagens recebidas <ArrowUpRight size={14}/></button></div>
  {view==='examples'?<>
