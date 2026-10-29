@@ -43,3 +43,10 @@ yarn-error.log*
 
 # OS metadata
 .DS_Store
+
+# Deployment state and nested dependencies
+.vercel/
+**/node_modules/
+*.sqlite*
+/deployment/**/.env
+/deployment/**/backups/
