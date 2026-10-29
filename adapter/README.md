@@ -30,3 +30,10 @@ Piloto: somente audio/ogg, até 10 MB e duração declarada de até 120 segundos
 Limitações: transcrições em andamento não têm fila durável; encerramento do conector durante o download/transcrição pode perder esse evento. A idempotência dos jobs do motor é em memória e não sobrevive ao reinício do motor. A confirmação final de áudio real pelo grupo ainda depende do conector ativo, das credenciais de runtime e de um teste ponta a ponta.
 
 Os trechos anteriores que dizem “sem áudio” descrevem a versão anterior. Imagem, documento, interpretação de negócio e lançamento automático por áudio continuam fora desta integração.
+
+## Comprovantes em imagem pelo WhatsApp
+Recebimento de JPEG/PNG até 5 MB, somente do grupo e remetentes permitidos. Download limitado em memória; evento assinado inclui os bytes em base64. A fila SQLite local mantém o payload privado até confirmação do backend. O backend valida assinatura, grupo, usuário, acesso, tamanho e tipo antes de salvar em R2. Mensagens repetidas usam a mesma chave de idempotência e não duplicam o comprovante.
+
+No painel: Comprovantes → Imagens do WhatsApp (proprietários). O responsável revisa a foto e pode anexá-la a lançamento existente sem alterar aprovação/pagamento, ou informar obra, descrição, valor e data para criar uma despesa pendente de aprovação. Uma imagem repetida por conteúdo gera aviso e exige confirmação extra antes de criar outra despesa. Não há OCR ou confirmação bancária automática nesta etapa. Áudio continua como transcrição para revisão em Eventos recentes.
+
+Dados de comprovantes são privados no R2 e na fila local; manter disco protegido. Imagens não reconhecidas ou falhas de download geram evento sem arquivo, exigindo reenvio. A lista local de remetentes usa WHATSAPP_AUDIO_ALLOWED_SENDERS nesta versão do piloto e deve acompanhar os vínculos do painel.

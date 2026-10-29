@@ -15,6 +15,13 @@
       "when": 1792705011879,
       "tag": "0001_serious_logan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793237347194,
+      "tag": "0002_soft_namor",
+      "breakpoints": true
     }
   ]
 }

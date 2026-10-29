@@ -27,6 +27,7 @@ export async function verifySignature(secret,raw,timestamp,signature,now=Date.no
 
 export function parseEvent(e){
  if(e.kind==='text')return parseText(e.text);
+ if(e.kind==='image')return {question:'Imagem recebida sem arquivo disponível para revisão. Reenvie uma foto JPEG ou PNG de até 5 MB. Nenhum lançamento criado.'};
  if(e.kind==='audio')return {question:e.text.trim()?'Áudio transcrito — aguardando revisão. Nenhum lançamento criado.\n'+e.text:'Áudio recebido sem transcrição disponível. Reenvie os dados em texto. Nenhum lançamento criado.'};
  return {question:'Mídia recebida; processamento de imagem e documento ainda não disponível. Envie os dados em texto. Nenhum arquivo armazenado.'};
 }

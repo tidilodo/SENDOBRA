@@ -10,3 +10,8 @@ export const whatsappGroups = sqliteTable('whatsapp_groups',{id:text('id').prima
 export const whatsappSenders = sqliteTable('whatsapp_senders',{id:text('id').primaryKey(),user:text('user').notNull().references(()=>users.id)});
 export const whatsappMessages = sqliteTable('whatsapp_messages',{id:text('id').primaryKey(),group:text('group_id').notNull(),sender:text('sender_id').notNull(),kind:text('kind').notNull(),status:text('status').notNull(),record:text('record_id'),received:text('received').notNull(),question:text('question'),correlation:text('correlation').notNull()});
 export const whatsappConnection = sqliteTable('whatsapp_connection',{id:text('id').primaryKey(),state:text('state').notNull(),updated:text('updated').notNull()});
+export const whatsappReceipts = sqliteTable('whatsapp_receipts',{
+ id:text('id').primaryKey(),message:text('message_id').notNull().unique().references(()=>whatsappMessages.id),
+ author:text('author').notNull().references(()=>users.id),mime:text('mime').notNull(),size:integer('size').notNull(),hash:text('hash').notNull(),caption:text('caption').notNull(),
+ received:text('received').notNull(),status:text('status').notNull().default('pending'),record:text('record_id').references(()=>records.id),reviewer:text('reviewer').references(()=>users.id)
+});

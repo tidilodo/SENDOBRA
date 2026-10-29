@@ -21,3 +21,6 @@ Não há implantação automática configurada. Backup e restauração, permiss�
 
 ## Integração de áudio (preparação em 28/10/2026)
 Cliente do Alquimia Audio Engine integrado ao conector, com lista explícita de remetentes e transcrição para revisão sem lançamento. Motor existente validado novamente: cinco testes de contrato e uma transcrição real de amostra sintética concluída. O teste pelo grupo permanece pendente até ativação do conector com o runtime correto. Consulte adapter/README.md.
+
+## Comprovantes em imagem
+Recebimento privado de JPEG/PNG até 5 MB e caixa de revisão em Comprovantes. A foto não cria despesa automaticamente. Vincule a lançamento existente ou preencha os dados para enviar uma nova despesa à aprovação. Deduplicação por mensagem, aviso por hash e proteção de revisão concorrente. OCR/leitura automática permanece pendente. Verificação do fluxo com Worker+D1+R2 em banco local isolado: `node tests/receipts-integration.mjs` (requer Worker local com segredo fictício e migrações aplicadas).
