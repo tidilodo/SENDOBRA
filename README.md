@@ -24,3 +24,6 @@ Cliente do Alquimia Audio Engine integrado ao conector, com lista explícita de 
 
 ## Comprovantes em imagem
 Recebimento privado de JPEG/PNG até 5 MB e caixa de revisão em Comprovantes. A foto não cria despesa automaticamente. Vincule a lançamento existente ou preencha os dados para enviar uma nova despesa à aprovação. Deduplicação por mensagem, aviso por hash e proteção de revisão concorrente. OCR/leitura automática permanece pendente. Verificação do fluxo com Worker+D1+R2 em banco local isolado: `node tests/receipts-integration.mjs` (requer Worker local com segredo fictício e migrações aplicadas).
+
+## Demonstração na Vercel
+Aplicação Next.js isolada em deployment/vercel-app. A interface de testes usa o backend privado atual e uma ponte assinada limitada à conta do cliente e às obras fictícias. Consulte docs/vercel-demo.md. A administração e o armazenamento não foram migrados para a Vercel; o conector WhatsApp continua local.

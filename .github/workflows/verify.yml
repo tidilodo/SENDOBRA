@@ -14,6 +14,6 @@ jobs:
           cache: npm
       - run: node scripts/check-source-safety.mjs
       - run: npm ci --include=dev --include=optional --no-audit --no-fund
-      - run: node --test tests/domain.test.mjs tests/whatsapp.test.mjs adapter/test.mjs adapter/audio-engine.test.mjs tests/receipts.test.mjs
+      - run: node --test tests/domain.test.mjs tests/whatsapp.test.mjs adapter/test.mjs adapter/audio-engine.test.mjs tests/receipts.test.mjs deployment/vercel-app/tests/session.test.mjs
       - run: npx --no-install tsc --noEmit
       - run: npm run build

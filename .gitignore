@@ -50,3 +50,6 @@ yarn-error.log*
 *.sqlite*
 /deployment/**/.env
 /deployment/**/backups/
+**/.next/
+**/next-env.d.ts
+**/*.tsbuildinfo
