@@ -21,3 +21,8 @@ Testes de sessão em deployment/vercel-app/tests; testes reais de Worker/D1/R2 e
 Atualizações da UI compartilhada precisam ser copiadas para deployment/vercel-app/app antes do build. Não copiar rotas cloudflare:workers para a Vercel. Não importar o projeto raiz diretamente na Vercel. Atualizações podem ser publicadas com a CLI a partir de deployment/vercel-app. Ainda não existe implantação automática da Vercel por push; GitHub Actions verifica o código.
 
 Para revogar o piloto: desativar a conta do cliente no painel original e remover/rotacionar o hash do convite na Vercel, com redeploy. Desativar a conta bloqueia as chamadas ao backend mesmo que uma sessão do navegador ainda esteja válida.
+
+## Apresentação ao cliente
+A aba Demonstração da Vercel usa exemplos ilustrativos de texto, áudio e comprovante. Esses exemplos não são inseridos no banco nem geram despesas. A visualização Mensagens recebidas continua consultando os eventos reais autorizados, com linguagem de operação e sem controles de exportação técnica.
+
+O JSON e a exportação permanecem no painel privado original do Sites, na tela Teste WhatsApp, para uso técnico dos responsáveis. A audiência desse painel não foi ampliada. O comprovante estático em public/demo é fictício e traz SEM VALOR FISCAL.
