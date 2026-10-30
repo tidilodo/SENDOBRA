@@ -9,7 +9,7 @@ async function webhook(request: Request, context: {params: Promise<{key: string}
     key: process.env.EVOLUTION_WEBHOOK_KEY,
     instance: 'tidi',
     group: '120363413918983742@g.us',
-    senders: ['140570185994259@lid'],
+    senders: ['140570185994259@lid', '1121137520784@lid'],
     secret: process.env.WHATSAPP_INGEST_SECRET,
     serviceToken: process.env.BRIDGE_SERVICE_TOKEN,
     site: process.env.BRIDGE_BACKEND_URL,
