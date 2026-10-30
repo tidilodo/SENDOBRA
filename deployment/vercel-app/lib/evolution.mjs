@@ -70,10 +70,17 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
   try {
     const body = JSON.parse(raw), data = body?.data, info = data?.Info, key = data?.key;
     const type = String(body?.event ?? body?.type ?? '').toLowerCase();
+    const chat = info?.Chat ?? key?.remoteJid;
+    const content = data?.Message ?? data?.message;
+    const marker = content?.conversation ?? content?.extendedTextMessage?.text;
     // Log only fixed classifications and booleans. Never log payloads, IDs, tokens or text.
     config.report?.({outcome:'received', bytes:Buffer.byteLength(raw), event:['message','messages.upsert'].includes(type)?'message':'other',
       envelope:info?'whatsmeow':key?'api':'other',
-      groupMatch:(info?.Chat ?? key?.remoteJid) === config.group,
+      instanceMatch:(body?.instance ?? body?.instanceName ?? config.instance) === config.instance,
+      chatShape:typeof chat,
+      chatType:typeof chat === 'string' ? chat.endsWith('@g.us')?'group':chat.endsWith('@newsletter')?'newsletter':'direct' : 'unknown',
+      testMarker:typeof marker === 'string' && /teste\s+(?:final\s+)?evolution/i.test(marker),
+      groupMatch:chat === config.group,
       senderMatch:config.senders.includes(info?.Sender ?? key?.participant),
       alternateMatch:config.senders.includes(info?.SenderAlt),
       own:(info?.IsFromMe ?? key?.fromMe) === true});
