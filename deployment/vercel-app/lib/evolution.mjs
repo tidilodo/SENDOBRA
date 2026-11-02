@@ -1,4 +1,5 @@
 import {createHmac, timingSafeEqual} from 'node:crypto';
+import {enrichMedia, MediaError} from './evolution-media.mjs';
 
 export function validWebhookKey(actual, expected) {
   if (typeof expected !== 'string' || expected.length < 32 || typeof actual !== 'string') return false;
@@ -50,7 +51,7 @@ export function normalizeEvolution(body, config, now = Date.now()) {
 export async function receiveEvolution(request, key, config, fetchImpl = fetch) {
   const reply = (body, status = 200) => Response.json(body, {status, headers: {'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer'}});
   if (!validWebhookKey(key, config.key)) return reply({error: 'Unauthorized'}, 401);
-  if (request.method === 'GET') return reply({ok: true, service: 'SENDOBRA webhook', media: 'metadata-only'});
+  if (request.method === 'GET') return reply({ok: true, service: 'SENDOBRA webhook', media: config.instanceToken && config.groqKey ? 'reading-enabled' : 'metadata-only'});
   if (!config.secret || !config.serviceToken || !config.site || !config.group || !config.senders?.length) return reply({error: 'Receiver unavailable'}, 503);
   if (!request.headers.get('content-type')?.startsWith('application/json')) return reply({error: 'JSON required'}, 415);
   const reader = request.body?.getReader();
@@ -61,14 +62,14 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
     while (true) {
       const part = await reader.read(); if (part.done) break;
       size += part.value.length;
-      if (size > 2 * 1024 * 1024) { await reader.cancel(); config.report?.({outcome:'oversized'}); return reply({error: 'Payload too large'}, 413); }
+      if (size > 4 * 1024 * 1024) { await reader.cancel(); config.report?.({outcome:'oversized'}); return reply({error: 'Payload too large'}, 413); }
       chunks.push(part.value);
     }
     raw = Buffer.concat(chunks).toString('utf8');
   } catch { return reply({error: 'Invalid body'}, 400); }
-  let event;
+  let event, body;
   try {
-    const body = JSON.parse(raw), data = body?.data, info = data?.Info, key = data?.key;
+    body = JSON.parse(raw); const data = body?.data, info = data?.Info, key = data?.key;
     const type = String(body?.event ?? body?.type ?? '').toLowerCase();
     const chat = info?.Chat ?? key?.remoteJid;
     const content = data?.Message ?? data?.message;
@@ -88,12 +89,20 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
   }
   catch { config.report?.({outcome:'invalid'}); return reply({error: 'Invalid event'}, 400); }
   if (!event) { config.report?.({outcome:'ignored'}); return reply({ok: true, ignored: true}); }
+  const signal=AbortSignal.timeout(50000);
+  if(['audio','image'].includes(event.kind)) {
+    try {event=await enrichMedia(event,body,config,fetchImpl,signal);config.report?.({outcome:'media-read',kind:event.kind});}
+    catch(error){
+      if(error instanceof MediaError&&!error.retry)event={...event,text:error.message+'. Nenhum lançamento criado.'};
+      else {config.report?.({outcome:'media-retry',kind:event.kind});return reply({error:'Media processing pending'},503);}
+    }
+  }
   try {
     const base = new URL(config.site);
     if (base.protocol !== 'https:') throw Error('HTTPS required');
     const payload = JSON.stringify(event), time = String(Date.now());
     const response = await fetchImpl(new URL('/api/whatsapp', base), {
-      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(45000),
+      method: 'POST', redirect: 'error', signal,
       headers: {'Content-Type': 'application/json', 'OAI-Sites-Authorization': 'Bearer ' + config.serviceToken,
         'X-Sendobra-Timestamp': time, 'X-Sendobra-Signature': 'v1=' + createHmac('sha256', config.secret).update(time + '.' + payload).digest('hex')},
       body: payload,
@@ -102,6 +111,6 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
     const result = await response.json();
     if (result.ok !== true) return reply({error: 'Delivery pending'}, 503);
     config.report?.({outcome:'persisted',duplicate:result.duplicate === true,kind:event.kind});
-    return reply({ok: true, duplicate: result.duplicate === true, media: event.kind === 'text' ? undefined : 'metadata-only'});
+    return reply({ok: true, duplicate: result.duplicate === true});
   } catch { config.report?.({outcome:'delivery-failed'}); return reply({error: 'Delivery pending'}, 503); }
 }

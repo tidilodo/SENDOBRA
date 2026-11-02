@@ -19,7 +19,7 @@ test('media metadata never masquerades as a transcribed or decoded file', () => 
 test('rejects invalid secret, oversized input and stale events without upstream calls',async()=>{
  const noFetch=()=>{throw Error('Must not call');};
  assert.equal((await receiveEvolution(request(sample()),'bad',config,noFetch)).status,401);
- assert.equal((await receiveEvolution(request({padding:'x'.repeat(2100000)}),config.key,config,noFetch)).status,413);
+ assert.equal((await receiveEvolution(request({padding:'x'.repeat(4200000)}),config.key,config,noFetch)).status,413);
  const stale=sample();stale.data.messageTimestamp=1;assert.equal((await receiveEvolution(request(stale),config.key,config,noFetch)).status,400);
 });
 test('maps the provider alternate LID only to an existing authorized sender', () => {
