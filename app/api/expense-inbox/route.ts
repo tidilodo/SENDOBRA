@@ -1,0 +1,57 @@
+import {env} from 'cloudflare:workers';
+import {money,canProject} from '../../domain.mjs';
+import {localExpense,validDate,possibleDuplicates} from '../../expense-domain.mjs';
+export const dynamic='force-dynamic';
+const json=(value:any,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
+async function owner(request:Request){const id=request.headers.get('oai-authenticated-user-id');return id?env.DB!.prepare("SELECT * FROM users WHERE identity=? AND role='owner' AND active=1").bind(id).first() as Promise<any>:null;}
+const textOf=(message:any)=>{const document=message.document?JSON.parse(message.document):{};return document.texto_original||(message.kind==='audio'&&message.question?.includes('\n')?message.question.split('\n').slice(1).join('\n'):'');};
+const timestampOf=(message:any)=>{const document=message.document?JSON.parse(message.document):{};return Date.parse(document.origem?.enviado_em||message.received);};
+async function context(){
+ const db=env.DB!;
+ const [p,m,r,f]=await Promise.all([
+  db.prepare("SELECT * FROM projects WHERE status='active'").all(),
+  db.prepare("SELECT m.*,u.id author,u.name author_name FROM whatsapp_messages m JOIN whatsapp_senders s ON s.id=m.sender_id JOIN users u ON u.id=COALESCE(json_extract(m.document,'$.origem.usuario_id'),(SELECT author FROM whatsapp_receipts WHERE message_id=m.id),s.user) ORDER BY m.received DESC LIMIT 200").all(),
+  db.prepare('SELECT * FROM records').all(),
+  db.prepare('SELECT * FROM whatsapp_receipts ORDER BY received DESC LIMIT 300').all()
+ ]);
+ return {projects:p.results as any[],messages:m.results as any[],records:r.results as any[],receipts:f.results as any[]};
+}
+function card(message:any,data:any){const draft=localExpense(textOf(message),message.kind,data.projects,timestampOf(message)),receipt=data.receipts.find((r:any)=>r.message_id===message.id);const others=data.messages.filter((m:any)=>m.id!==message.id&&!m.record_id).map((m:any)=>({id:m.id,draft:localExpense(textOf(m),m.kind,data.projects,timestampOf(m))}));const hashes=receipt?data.receipts.filter((r:any)=>r.id!==receipt.id&&r.hash===receipt.hash).map((r:any)=>({id:r.record_id||r.message_id,source:r.record_id?'record':'message',description:'Comprovante já recebido'})):[];return {id:message.id,kind:message.kind,status:message.status,received:message.received,author:message.author_name,record:message.record_id,original:textOf(message),receipt:receipt?.id||null,draft,duplicates:possibleDuplicates(draft,data.records,others,hashes)};}
+export async function GET(request:Request){try{if(!await owner(request))return json({error:'Somente proprietário autenticado'},403);const data=await context();return json({items:data.messages.map(m=>card(m,data))});}catch{return json({error:'Não foi possível consultar as fichas'},500);}}
+export async function POST(request:Request){try{
+ if(request.headers.get('origin')!==new URL(request.url).origin)return json({error:'Origem inválida'},403);
+ const user=await owner(request);if(!user)return json({error:'Somente proprietário autenticado'},403);
+ const raw=await request.text();if(raw.length>8192)return json({error:'Ficha muito grande'},413);const body=JSON.parse(raw);if(typeof body.id!=='string'||body.id.length>310||!['submit','link'].includes(body.action))return json({error:'Ficha inválida'},400);
+ const db=env.DB!,data=await context(),message:any=data.messages.find(m=>m.id===body.id);if(!message)return json({error:'Mensagem não encontrada'},404);if(message.record_id)return json({error:'Esta mensagem já foi revisada. Atualize a lista.'},409);
+ const author:any=await db.prepare('SELECT * FROM users WHERE id=? AND active=1').bind(message.author).first();if(!author)return json({error:'Remetente não está ativo'},403);
+ const receipt=data.receipts.find(r=>r.message_id===message.id);if(receipt&&receipt.status!=='pending')return json({error:'Comprovante já revisado'},409);
+ const before=message.document?JSON.parse(message.document):{},now=new Date().toISOString();let recordId:string,project:string,description:string,amount:number,date:string,category:string,supplier:string|null,queries:any[]=[];
+ if(body.action==='link'){
+  const record=data.records.find(r=>r.id===body.record);if(!record||record.type!=='expense'||!canProject(user,record.project)||!canProject(author,record.project))return json({error:'Lançamento não autorizado para este remetente'},403);
+  recordId=record.id;project=record.project;description=record.description;amount=record.amount;date=record.date;category=record.category;supplier=record.supplier;
+ }else{
+  if(body.confirm_review!==true)return json({error:'Confirme a conferência dos dados'},400);
+  project=String(body.project||'');if(!data.projects.some(p=>p.id===project)||!canProject(author,project))return json({error:'Escolha uma obra ativa autorizada ao remetente'},403);
+  description=typeof body.description==='string'?body.description.trim():'';if(!description||description.length>1000)return json({error:'Descrição obrigatória com até 1.000 caracteres'},400);
+  if(!validDate(body.date))return json({error:'Informe uma data existente'},400);date=body.date;amount=money(body.amount);
+  const proposed=card(message,data);if(proposed.draft.multiplas_obras&&body.confirm_single_project!==true)return json({error:'Confira uma única despesa e obra por ficha; separe as demais despesas'},400);
+  const hashes:any[]=receipt?(await db.prepare('SELECT id,message_id,record_id FROM whatsapp_receipts WHERE hash=? AND id<>?').bind(receipt.hash,receipt.id).all()).results as any[]:[];
+  const duplicates=possibleDuplicates({project,valor_centavos:amount,data:date},data.records,data.messages.filter(m=>m.id!==message.id&&!m.record_id).map(m=>({id:m.id,draft:localExpense(textOf(m),m.kind,data.projects,timestampOf(m))})),hashes.map(r=>({id:r.record_id||r.message_id,source:r.record_id?'record':'message',description:'Comprovante repetido'})));
+  if(duplicates.length&&body.confirm_distinct!==true)return json({error:'Possível duplicidade. Vincule ao lançamento existente ou confirme que é uma despesa distinta.',duplicates},409);
+  category=typeof body.category==='string'?body.category:'Sem categoria';if(category!=='Sem categoria'&&!await db.prepare('SELECT id FROM categories WHERE name=?').bind(category).first())return json({error:'Categoria inválida'},400);
+  supplier=body.supplier?String(body.supplier):null;if(supplier&&!await db.prepare('SELECT id FROM suppliers WHERE id=?').bind(supplier).first())return json({error:'Fornecedor inválido'},400);
+  recordId=crypto.randomUUID();
+ }
+ const available="EXISTS(SELECT 1 FROM whatsapp_messages WHERE id=? AND record_id IS NULL)"+(receipt?" AND EXISTS(SELECT 1 FROM whatsapp_receipts WHERE id=? AND status='pending')":'');
+ const args=receipt?[message.id,receipt.id]:[message.id];
+ if(body.action==='submit')queries.push(db.prepare('INSERT INTO records SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE '+available).bind(recordId,project,message.author,description,amount,'expense',category,supplier,date,'pending_approval','unreported',now,...args));
+ const status=body.action==='submit'?'pending_approval':'linked';
+ const document={...before,versao_schema:'1.1',texto_original:textOf(message),despesa:{tipo_registro:'despesa',obra:project,valor_centavos:amount,data:date,descricao:description,fornecedor:supplier,categoria:category},dados:{...before.dados,obra_id:project,lancamento_id:recordId},revisao:{status,revisao_id:crypto.randomUUID(),conferido_por:user.id,conferido_em:now,despesa_distinta:body.confirm_distinct===true}};
+ const serialized=JSON.stringify(document);
+ queries.push(db.prepare('UPDATE whatsapp_messages SET status=?,record_id=?,document=?,question=? WHERE id=? AND record_id IS NULL'+(receipt?" AND EXISTS(SELECT 1 FROM whatsapp_receipts WHERE id=? AND status='pending')":'')).bind(status,recordId,serialized,body.action==='submit'?'Despesa aguardando aprovação. Pagamento não informado.':'Vinculada ao lançamento existente; nenhum novo lançamento criado.',message.id,...(receipt?[receipt.id]:[])));
+ const updateIndex=body.action==='submit'?1:0;
+ if(receipt){queries.push(db.prepare('INSERT INTO attachments SELECT ?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM whatsapp_messages WHERE id=? AND record_id=? AND document=?)').bind(receipt.id,recordId,'Comprovante WhatsApp.'+(receipt.mime==='image/png'?'png':'jpg'),receipt.mime,receipt.size,receipt.hash,receipt.author,now,message.id,recordId,serialized));queries.push(db.prepare("UPDATE whatsapp_receipts SET status='linked',record_id=?,reviewer=? WHERE id=? AND EXISTS(SELECT 1 FROM whatsapp_messages WHERE id=? AND record_id=? AND document=?)").bind(recordId,user.id,receipt.id,message.id,recordId,serialized));}
+ queries.push(db.prepare('INSERT INTO audit SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM whatsapp_messages WHERE id=? AND record_id=? AND document=?)').bind(crypto.randomUUID(),user.id,'whatsapp.expense.'+body.action,message.id,JSON.stringify(before),JSON.stringify({record:recordId,project,amount,status,distinct:body.confirm_distinct===true}),now,message.id,recordId,serialized));
+ const result=await db.batch(queries);if(!result[updateIndex].meta.changes)return json({error:'Mensagem revisada em outra sessão. Atualize a lista.'},409);
+ return json({ok:true,record:recordId,status});
+ }catch{return json({error:'Não foi possível revisar a ficha. Confira os dados.'},400);}}

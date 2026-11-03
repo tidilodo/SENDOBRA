@@ -1,6 +1,7 @@
 import {env} from 'cloudflare:workers';
 import {decodeReceipt} from '../../receipt-domain.mjs';
 import {canProject} from '../../domain.mjs';
+import {localExpense} from '../../expense-domain.mjs';
 import {validateEvent,parseEvent,verifySignature} from '../../whatsapp-domain.mjs';
 export const dynamic='force-dynamic';
 const json=(b:any,s=200)=>Response.json(b,{status:s,headers:{'Cache-Control':'no-store'}});
@@ -13,8 +14,11 @@ export async function POST(r:Request){
  const b:any=JSON.parse(raw),db=env.DB!,now=new Date().toISOString();
  if(b.event==='connection'){if(!['connecting','connected','disconnected','pairing_required'].includes(b.state))return json({error:'Estado inválido'},400);await db.prepare('INSERT INTO whatsapp_connection VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state, updated=excluded.updated').bind('primary',b.state,now).run();return json({ok:true});}
  const e=validateEvent(b);const group:any=await db.prepare('SELECT * FROM whatsapp_groups WHERE id=? AND active=1').bind(e.group).first();if(!group)return json({error:'Grupo não autorizado'},403);
- const u:any=await db.prepare('SELECT users.* FROM users JOIN whatsapp_senders ON users.id=whatsapp_senders.user WHERE whatsapp_senders.id=? AND users.active=1').bind(e.sender).first();if(!u||!canProject(u,group.project))return json({error:'Remetente não autorizado para esta obra'},403);
- const document=JSON.stringify({versao_schema:'1.0',tipo:e.kind==='image'?'comprovante':e.kind==='audio'?'audio_transcrito':'texto',origem:{canal:'whatsapp',mensagem_id:e.id,grupo_id:e.group,remetente_id:e.sender,recebido_em:now},texto_original:e.text||null,dados:{obra_id:null},revisao:{status:'pendente',campos_a_confirmar:['obra','dados_do_registro']}});
+ const u:any=await db.prepare('SELECT users.* FROM users JOIN whatsapp_senders ON users.id=whatsapp_senders.user WHERE whatsapp_senders.id=? AND users.active=1').bind(e.sender).first();if(!u)return json({error:'Remetente não autorizado'},403);
+ const flow=b.expense_flow===1;
+ const projects:any[]=flow?((await db.prepare("SELECT * FROM projects WHERE status='active'").all()).results as any[]).filter(p=>canProject(u,p.id)):[];
+ if(flow?!projects.length:!canProject(u,group.project))return json({error:'Remetente sem obra autorizada'},403);
+ const document=JSON.stringify({versao_schema:'1.1',tipo:e.kind==='image'?'comprovante':e.kind==='audio'?'audio_transcrito':'texto',origem:{canal:'whatsapp',mensagem_id:e.id,grupo_id:e.group,remetente_id:e.sender,usuario_id:u.id,enviado_em:new Date(e.timestamp).toISOString(),recebido_em:now},texto_original:e.text||null,dados:{obra_id:null},revisao:{status:'pendente',campos_a_confirmar:['obra','dados_do_registro']},...(flow?{despesa:localExpense(e.text,e.kind,projects,e.timestamp)}:{})});
  const messageId=e.group+':'+e.id;const existing:any=await db.prepare('SELECT status, record_id, question FROM whatsapp_messages WHERE id=?').bind(messageId).first();if(existing)return json({ok:true,duplicate:true,status:existing.status,record:existing.record_id});
  if(e.kind==='image'&&b.image){
  const image=decodeReceipt(b.image),receipt=crypto.randomUUID(),correlation=crypto.randomUUID();
@@ -28,7 +32,7 @@ export async function POST(r:Request){
  ]);}catch(error){await env.BUCKET!.delete(receipt);const duplicate:any=await db.prepare('SELECT status,record_id FROM whatsapp_messages WHERE id=?').bind(messageId).first();if(duplicate)return json({ok:true,duplicate:true,status:duplicate.status,record:duplicate.record_id});throw error;}
  return json({ok:true,status:'awaiting_review',record:null,receipt,correlation});
  }
- const parsed:any=parseEvent(e);
+ const parsed:any=flow?{question:'Informação organizada para conferência. Confirme obra, valor, data e descrição antes de enviar para aprovação. Nenhum lançamento criado.'}:parseEvent(e);
  const status=parsed.question?'awaiting_clarification':(['owner','manager'].includes(u.role)?'approved':'pending_approval');
  const recordId=parsed.question?null:crypto.randomUUID(),correlation=crypto.randomUUID();
  const q=[db.prepare('INSERT INTO whatsapp_messages(id,group_id,sender_id,kind,status,record_id,received,question,correlation) VALUES(?,?,?,?,?,?,?,?,?)').bind(messageId,e.group,e.sender,e.kind,status,recordId,now,parsed.question||null,correlation)];

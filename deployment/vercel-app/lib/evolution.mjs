@@ -97,6 +97,8 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
       else {config.report?.({outcome:'media-retry',kind:event.kind});return reply({error:'Media processing pending'},503);}
     }
   }
+  // Expense interpretation stays inside the backend; no new external text processing.
+  event={...event,expense_flow:1};
   try {
     const base = new URL(config.site);
     if (base.protocol !== 'https:') throw Error('HTTPS required');
