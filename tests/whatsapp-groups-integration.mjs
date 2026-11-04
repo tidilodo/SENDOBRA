@@ -1,0 +1,71 @@
+import assert from 'node:assert/strict';
+import {createHmac} from 'node:crypto';
+import {readFile,readdir} from 'node:fs/promises';
+import {build} from 'esbuild';
+import {Miniflare} from 'miniflare';
+
+const base='http://127.0.0.1:8787',secret='isolated-fixture-not-a-live-secret';
+const a='123456789001@g.us',b='123456789002@g.us',unknown='123456789003@g.us';
+const aSender='100001@lid',bSender='100002@lid',customer='100003@lid';
+const groupNames={[a]:'Grupo da Obra Alfa',[b]:'Grupo da Obra Beta'};
+const script=(await build({entryPoints:['tests/fixtures/group-worker.ts'],bundle:true,write:false,format:'esm',platform:'neutral',external:['cloudflare:workers']})).outputFiles[0].text;
+const mf=new Miniflare({modules:true,script,host:'127.0.0.1',compatibilityDate:'2026-05-22',d1Databases:['DB'],r2Buckets:['BUCKET'],bindings:{WHATSAPP_INGEST_SECRET:secret},outboundService:async req=>{
+ assert.equal(new URL(req.url).pathname,'/api/evolution-control');
+ const raw=await req.text(),time=req.headers.get('x-sendobra-timestamp');assert.equal(req.headers.get('x-sendobra-signature'),'v1='+createHmac('sha256',secret).update(time+'.'+raw).digest('hex'));
+ const call=JSON.parse(raw);if(call.action==='groups')return Response.json({connected:true,loggedIn:true,groups:Object.entries(groupNames).map(([id,name])=>({id,name}))});
+ if(call.action==='members'&&groupNames[call.group])return Response.json({name:groupNames[call.group],members:[aSender,bSender,customer].map((sender,i)=>({sender,name:'Participante fictício '+i,phone:'55000000000'+i}))});
+ return new Response(null,{status:404});
+}});
+const auth=(id='owner')=>({'oai-authenticated-user-id':id,'oai-authenticated-user-email':id+'@fixture.test',Origin:base,'Content-Type':'application/json'});
+async function req(path,body,headers=auth()){const r=await mf.dispatchFetch(base+path,{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined});return {status:r.status,data:r.headers.get('content-type')?.includes('application/json')?await r.json():null};}
+async function signed(path,body,key=secret){const raw=JSON.stringify(body),time=String(Date.now());return req(path,body,{'Content-Type':'application/json','x-sendobra-timestamp':time,'x-sendobra-signature':'v1='+createHmac('sha256',key).update(time+'.'+raw).digest('hex')});}
+const config=(action,extra={},headers=auth())=>req('/api/whatsapp-config',{action,...extra},headers);
+try{
+ const db=await mf.getD1Database('DB');for(const f of (await readdir('drizzle')).filter(f=>f.endsWith('.sql')).sort())for(const sql of (await readFile('drizzle/'+f,'utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
+ console.log('Fixture schema ready.');
+ assert.equal((await req('/api/data')).status,200);
+ const projectA=(await req('/api/data',{action:'projects',name:'Obra Alfa',code:'ALFA-QA'})).data.id;
+ const projectB=(await req('/api/data',{action:'projects',name:'Obra Beta',code:'BETA-QA'})).data.id;
+ const userA=(await req('/api/data',{action:'users',name:'Equipe Alfa',email:'alpha@fixture.test',role:'employee',projects:[projectA]})).data.id;
+ const userB=(await req('/api/data',{action:'users',name:'Equipe Beta',email:'beta@fixture.test',role:'employee',projects:[projectB]})).data.id;
+ await req('/api/data',undefined,auth('alpha'));await req('/api/data',undefined,auth('beta'));
+ assert.equal((await config('discover',{},auth('alpha'))).status,403);
+ const discovered=await config('discover');assert.equal(discovered.status,200,JSON.stringify(discovered));assert.equal(discovered.data.count,2);
+ for(const group of [a,b])assert.equal((await config('members',{group})).data.members.length,3);
+ assert.equal((await config('connect_group',{group:b,project:projectB,senders:[{sender:aSender,user:userA}]})).status,403);
+ assert.equal((await config('connect_group',{group:a,project:projectA,senders:[{sender:aSender,user:userA}]})).status,200);
+ assert.equal((await config('connect_group',{group:b,project:projectB,senders:[{sender:bSender,user:userB}]})).status,200);
+ assert.equal((await config('connect_group',{group:a,project:projectB,senders:[{sender:bSender,user:userB}]})).status,409);
+ assert.equal((await signed('/api/whatsapp-routing',{group:a,sender:aSender},'wrong')).status,401);
+ assert.deepEqual((await signed('/api/whatsapp-routing',{group:a,sender:'550000000001@s.whatsapp.net',alternate:aSender})).data,{ok:true,authorized:true,sender:aSender});
+ for(const [group,sender] of [[a,bSender],[b,aSender],[b,customer],[unknown,aSender]])assert.equal((await signed('/api/whatsapp-routing',{group,sender})).data.authorized,false);
+ const now=Date.now(),send=(group,sender,id,text,kind='text',extra={})=>signed('/api/whatsapp',{id,group,sender,text,kind,timestamp:now,...extra});
+ const before=(await req('/api/data')).data.records.length;
+ const one=await send(a,aSender,'audio-alfa','Comprei cimento por R$ 120 hoje','audio');assert.equal(one.status,200);assert.equal(one.data.record,null);
+ assert.equal((await send(a,aSender,'audio-alfa','Comprei cimento por R$ 120 hoje','audio')).data.duplicate,true);
+ const two=await send(b,bSender,'texto-beta','Comprei telhas por R$ 240 hoje');assert.equal(two.status,200);assert.equal(two.data.record,null);
+ const conflict=await send(b,bSender,'conflito','Comprei brita por R$ 50 para Obra Alfa hoje');assert.equal(conflict.status,200);
+ assert.equal((await send(b,aSender,'rejeitado','Dados de outro grupo')).status,403);
+ const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6x8UAAAAASUVORK5CYII=';
+ const receipt=await send(a,aSender,'img-alfa','Valor informado: R$ 25,00','image',{image:{mime:'image/png',base64:png}});assert.equal(receipt.status,200);assert.ok(receipt.data.receipt);
+ const review=(await req('/api/expense-inbox')).data.items;
+ assert.equal(review.find(x=>x.id===a+':audio-alfa').draft.project,projectA);
+ assert.equal(review.find(x=>x.id===b+':texto-beta').draft.project,projectB);
+ assert.equal(review.find(x=>x.id===b+':conflito').draft.project,null);
+ assert.equal(review.find(x=>x.id===b+':conflito').draft.group_conflict,true);
+ assert.equal((await req('/api/expense-inbox',{id:b+':conflito',action:'submit',project:projectB,confirm_review:true})).status,400);
+ assert.equal((await req('/api/data')).data.records.length,before);
+ assert.equal((await config('pause',{group:a,active:false})).status,200);
+ assert.equal((await signed('/api/whatsapp-routing',{group:a,sender:aSender})).data.authorized,false);
+ assert.equal((await signed('/api/whatsapp-routing',{group:b,sender:bSender})).data.authorized,true);
+ assert.equal((await send(a,aSender,'pausado','Comprei cimento')).status,403);
+ const alpha=(await req('/api/test-inbox',undefined,auth('alpha'))).data.events;
+ const beta=(await req('/api/test-inbox',undefined,auth('beta'))).data.events;
+ assert.ok(alpha.some(x=>x.id===a+':img-alfa'));assert.ok(!beta.some(x=>x.id===a+':img-alfa'));
+ assert.equal((await req('/api/test-inbox?file='+receipt.data.receipt,undefined,auth('alpha'))).status,200);
+ assert.equal((await req('/api/test-inbox?file='+receipt.data.receipt,undefined,auth('beta'))).status,403);
+ const summary=(await req('/api/whatsapp-config')).data.groups.find(x=>x.id===a);assert.equal(summary.active,0);assert.equal(summary.pending,2);assert.ok(summary.last_received);
+ assert.equal((await config('pause',{group:a,active:true})).status,200);
+ assert.equal((await signed('/api/whatsapp-routing',{group:a,sender:aSender})).data.authorized,true);
+ console.log('PASS: two project groups, provider discovery, member authorization, preflight, group defaults, work conflict, deduplication, private receipts, pause/resume and preserved history. Local fixtures only.');
+}finally{await mf.dispose();}

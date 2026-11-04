@@ -17,11 +17,13 @@ export async function POST(r:Request){try{
  const u=await owner(r);if(!u)return json({error:'Somente proprietário autenticado'},403);
  const b:any=await r.json();if(!b||typeof b.id!=='string'||b.id.length>100)return json({error:'Imagem inválida'},400);
  const db=env.DB!,receipt:any=await db.prepare('SELECT * FROM whatsapp_receipts WHERE id=?').bind(b.id).first();if(!receipt)return json({error:'Imagem inexistente'},404);if(receipt.status!=='pending')return json({error:'Esta imagem já foi revisada. Atualize a lista.'},409);
+ const context:any=await db.prepare("SELECT json_extract(document,'$.contexto_grupo.project_id') project FROM whatsapp_messages WHERE id=?").bind(receipt.message_id).first();
  const now=new Date().toISOString(),attachment=receipt.id;let recordId:string,queries:any[]=[];
  if(b.action==='link'){
- const record:any=await db.prepare('SELECT * FROM records WHERE id=?').bind(String(b.record||'')).first();if(!record||!canProject(u,record.project))return json({error:'Lançamento não autorizado'},403);recordId=record.id;
+ const record:any=await db.prepare('SELECT * FROM records WHERE id=?').bind(String(b.record||'')).first();if(!record||!canProject(u,record.project))return json({error:'Lançamento não autorizado'},403);if(context?.project&&context.project!==record.project)return json({error:'Use Conferência para revisar uma divergência de obra'},409);recordId=record.id;
  }else if(b.action==='create'){
  const project=typeof b.project==='string'&&await db.prepare("SELECT id FROM projects WHERE id=? AND status='active'").bind(b.project).first();if(!project||!canProject(u,b.project))return json({error:'Escolha uma obra válida'},400);
+ if(context?.project&&context.project!==b.project)return json({error:'Use Conferência para revisar uma divergência de obra'},409);
  const author:any=await db.prepare('SELECT * FROM users WHERE id=? AND active=1').bind(receipt.author).first();if(!author||!canProject(author,b.project))return json({error:'Remetente sem acesso à obra escolhida'},403);
  const description=typeof b.description==='string'?b.description.trim():'';if(!description||description.length>1000)return json({error:'Descrição obrigatória com até 1.000 caracteres'},400);
  if(typeof b.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(b.date)||Number.isNaN(Date.parse(b.date))||new Date(b.date).toISOString().slice(0,10)!==b.date)return json({error:'Data inválida'},400);

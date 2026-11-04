@@ -1,11 +1,11 @@
 import {env} from 'cloudflare:workers';
 import {money,canProject} from '../../domain.mjs';
-import {localExpense,validDate,possibleDuplicates} from '../../expense-domain.mjs';
+import {validDate,possibleDuplicates} from '../../expense-domain.mjs';
+import {messageDraft} from '../../group-domain.mjs';
 export const dynamic='force-dynamic';
 const json=(value:any,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
 async function owner(request:Request){const id=request.headers.get('oai-authenticated-user-id');return id?env.DB!.prepare("SELECT * FROM users WHERE identity=? AND role='owner' AND active=1").bind(id).first() as Promise<any>:null;}
 const textOf=(message:any)=>{const document=message.document?JSON.parse(message.document):{};return document.texto_original||(message.kind==='audio'&&message.question?.includes('\n')?message.question.split('\n').slice(1).join('\n'):'');};
-const timestampOf=(message:any)=>{const document=message.document?JSON.parse(message.document):{};return Date.parse(document.origem?.enviado_em||message.received);};
 async function context(){
  const db=env.DB!;
  const [p,m,r,f]=await Promise.all([
@@ -16,7 +16,7 @@ async function context(){
  ]);
  return {projects:p.results as any[],messages:m.results as any[],records:r.results as any[],receipts:f.results as any[]};
 }
-function card(message:any,data:any){const draft=localExpense(textOf(message),message.kind,data.projects,timestampOf(message)),receipt=data.receipts.find((r:any)=>r.message_id===message.id);const others=data.messages.filter((m:any)=>m.id!==message.id&&!m.record_id).map((m:any)=>({id:m.id,draft:localExpense(textOf(m),m.kind,data.projects,timestampOf(m))}));const hashes=receipt?data.receipts.filter((r:any)=>r.id!==receipt.id&&r.hash===receipt.hash).map((r:any)=>({id:r.record_id||r.message_id,source:r.record_id?'record':'message',description:'Comprovante já recebido'})):[];return {id:message.id,kind:message.kind,status:message.status,received:message.received,author:message.author_name,record:message.record_id,original:textOf(message),receipt:receipt?.id||null,draft,duplicates:possibleDuplicates(draft,data.records,others,hashes)};}
+function card(message:any,data:any){const draft=messageDraft(message,data.projects),receipt=data.receipts.find((r:any)=>r.message_id===message.id);const others=data.messages.filter((m:any)=>m.id!==message.id&&!m.record_id).map((m:any)=>({id:m.id,draft:messageDraft(m,data.projects)}));const hashes=receipt?data.receipts.filter((r:any)=>r.id!==receipt.id&&r.hash===receipt.hash).map((r:any)=>({id:r.record_id||r.message_id,source:r.record_id?'record':'message',description:'Comprovante já recebido'})):[];return {id:message.id,kind:message.kind,status:message.status,received:message.received,author:message.author_name,record:message.record_id,original:textOf(message),receipt:receipt?.id||null,draft,duplicates:possibleDuplicates(draft,data.records,others,hashes)};}
 export async function GET(request:Request){try{if(!await owner(request))return json({error:'Somente proprietário autenticado'},403);const data=await context();return json({items:data.messages.map(m=>card(m,data))});}catch{return json({error:'Não foi possível consultar as fichas'},500);}}
 export async function POST(request:Request){try{
  if(request.headers.get('origin')!==new URL(request.url).origin)return json({error:'Origem inválida'},403);
@@ -26,17 +26,20 @@ export async function POST(request:Request){try{
  const author:any=await db.prepare('SELECT * FROM users WHERE id=? AND active=1').bind(message.author).first();if(!author)return json({error:'Remetente não está ativo'},403);
  const receipt=data.receipts.find(r=>r.message_id===message.id);if(receipt&&receipt.status!=='pending')return json({error:'Comprovante já revisado'},409);
  const before=message.document?JSON.parse(message.document):{},now=new Date().toISOString();let recordId:string,project:string,description:string,amount:number,date:string,category:string,supplier:string|null,queries:any[]=[];
+ const proposed=messageDraft(message,data.projects);
+ if(proposed.multiplas_obras&&body.confirm_single_project!==true)return json({error:'Confirme a obra correta para esta despesa antes de continuar'},400);
  if(body.action==='link'){
   const record=data.records.find(r=>r.id===body.record);if(!record||record.type!=='expense'||!canProject(user,record.project)||!canProject(author,record.project))return json({error:'Lançamento não autorizado para este remetente'},403);
   recordId=record.id;project=record.project;description=record.description;amount=record.amount;date=record.date;category=record.category;supplier=record.supplier;
+  if(proposed.group_project&&project!==proposed.group_project)return json({error:'Escolha um lançamento da obra vinculada ao grupo'},409);
  }else{
   if(body.confirm_review!==true)return json({error:'Confirme a conferência dos dados'},400);
   project=String(body.project||'');if(!data.projects.some(p=>p.id===project)||!canProject(author,project))return json({error:'Escolha uma obra ativa autorizada ao remetente'},403);
+  if(proposed.group_project&&project!==proposed.group_project)return json({error:'Use a obra vinculada ao grupo para esta despesa'},409);
   description=typeof body.description==='string'?body.description.trim():'';if(!description||description.length>1000)return json({error:'Descrição obrigatória com até 1.000 caracteres'},400);
   if(!validDate(body.date))return json({error:'Informe uma data existente'},400);date=body.date;amount=money(body.amount);
-  const proposed=card(message,data);if(proposed.draft.multiplas_obras&&body.confirm_single_project!==true)return json({error:'Confira uma única despesa e obra por ficha; separe as demais despesas'},400);
   const hashes:any[]=receipt?(await db.prepare('SELECT id,message_id,record_id FROM whatsapp_receipts WHERE hash=? AND id<>?').bind(receipt.hash,receipt.id).all()).results as any[]:[];
-  const duplicates=possibleDuplicates({project,valor_centavos:amount,data:date},data.records,data.messages.filter(m=>m.id!==message.id&&!m.record_id).map(m=>({id:m.id,draft:localExpense(textOf(m),m.kind,data.projects,timestampOf(m))})),hashes.map(r=>({id:r.record_id||r.message_id,source:r.record_id?'record':'message',description:'Comprovante repetido'})));
+  const duplicates=possibleDuplicates({project,valor_centavos:amount,data:date},data.records,data.messages.filter(m=>m.id!==message.id&&!m.record_id).map(m=>({id:m.id,draft:messageDraft(m,data.projects)})),hashes.map(r=>({id:r.record_id||r.message_id,source:r.record_id?'record':'message',description:'Comprovante repetido'})));
   if(duplicates.length&&body.confirm_distinct!==true)return json({error:'Possível duplicidade. Vincule ao lançamento existente ou confirme que é uma despesa distinta.',duplicates},409);
   category=typeof body.category==='string'?body.category:'Sem categoria';if(category!=='Sem categoria'&&!await db.prepare('SELECT id FROM categories WHERE name=?').bind(category).first())return json({error:'Categoria inválida'},400);
   supplier=body.supplier?String(body.supplier):null;if(supplier&&!await db.prepare('SELECT id FROM suppliers WHERE id=?').bind(supplier).first())return json({error:'Fornecedor inválido'},400);

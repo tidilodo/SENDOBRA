@@ -33,3 +33,24 @@ test('signs delivery and only acknowledges confirmed backend persistence, includ
  assert.deepEqual(await (await receiveEvolution(request(sample()),config.key,config,mock)).json(),{ok:true,duplicate:true});
  assert.equal((await receiveEvolution(request(sample()),config.key,config,async()=>new Response('',{status:503}))).status,503);
 });
+test('group routing is checked before downloading audio or sending it to transcription',async()=>{
+ const b=sample(),group='987654321@g.us';b.data.key.remoteJid=group;b.data.message={audioMessage:{url:'https://mmg.whatsapp.net/private'}};
+ const calls=[];const mock=async(url,options)=>{calls.push(url.pathname);const metadata=JSON.parse(options.body);assert.deepEqual(metadata,{group,sender:config.senders[0]});assert.match(options.headers['X-Sendobra-Signature'],/^v1=[a-f0-9]{64}$/);return Response.json({ok:true,authorized:false});};
+ const {group:_,senders:__,...dynamic}=config;
+ assert.deepEqual(await (await receiveEvolution(request(b),config.key,{...dynamic,dynamicRouting:true},mock)).json(),{ok:true,ignored:true});
+ assert.deepEqual(calls,['/api/whatsapp-routing']);
+});
+test('two distinct groups use the canonical sender returned by the live routing policy',async()=>{
+ const {group:_,senders:__,...dynamic}=config;
+ for(const group of ['987654321@g.us','987654322@g.us']){
+  const b=sample(),alternate=config.senders[0];b.data.key.remoteJid=group;b.data.key.participant='5511999999999@s.whatsapp.net';b.data.key.participantAlt=alternate;
+  const mock=async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.group,group);if(url.pathname==='/api/whatsapp-routing'){assert.equal(body.alternate,alternate);assert.equal(body.text,undefined);return Response.json({ok:true,authorized:true,sender:alternate});}assert.equal(url.pathname,'/api/whatsapp');assert.equal(body.sender,alternate);assert.equal(body.expense_flow,1);return Response.json({ok:true});};
+  assert.equal((await receiveEvolution(request(b),config.key,{...dynamic,dynamicRouting:true},mock)).status,200);
+ }
+});
+test('group announcements record discovery metadata without persisting a message',async()=>{
+ const {group:_,senders:__,...dynamic}=config;
+ const b={event:'JoinedGroup',instanceName:'tidi',data:{JID:'987654321@g.us',Name:'Obra QA',Participants:[{private:'never forwarded'}]}};
+ const mock=async(url,options)=>{assert.equal(url.pathname,'/api/whatsapp-routing');assert.deepEqual(JSON.parse(options.body),{group:'987654321@g.us',name:'Obra QA'});return Response.json({ok:true,authorized:false});};
+ assert.deepEqual(await (await receiveEvolution(request(b),config.key,{...dynamic,dynamicRouting:true},mock)).json(),{ok:true,ignored:true});
+});

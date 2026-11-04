@@ -1,5 +1,14 @@
 import {createHmac, timingSafeEqual} from 'node:crypto';
 import {enrichMedia, MediaError} from './evolution-media.mjs';
+import {evolutionInfo,groupSummary} from './evolution-control.mjs';
+
+const senderId=value=>typeof value==='string'&&/^\d{5,30}@(s\.whatsapp\.net|lid)$/.test(value);
+const groupId=value=>typeof value==='string'&&/^\d{5,30}@g\.us$/.test(value);
+async function signedRequest(config,path,body,signal,fetchImpl){
+ const base=new URL(config.site);if(base.protocol!=='https:')throw Error('HTTPS required');
+ const payload=JSON.stringify(body),time=String(Date.now());
+ return fetchImpl(new URL(path,base),{method:'POST',redirect:'error',signal,headers:{'Content-Type':'application/json','OAI-Sites-Authorization':'Bearer '+config.serviceToken,'X-Sendobra-Timestamp':time,'X-Sendobra-Signature':'v1='+createHmac('sha256',config.secret).update(time+'.'+payload).digest('hex')},body:payload});
+}
 
 export function validWebhookKey(actual, expected) {
   if (typeof expected !== 'string' || expected.length < 32 || typeof actual !== 'string') return false;
@@ -25,7 +34,7 @@ export function normalizeEvolution(body, config, now = Date.now()) {
   const group = info ? info.Chat : key.remoteJid;
   // Go may swap the phone JID into Sender and preserve the original LID in SenderAlt.
   // Resolve only to an already-authorized identity; never enroll a new sender here.
-  const candidates = info ? [info.Sender, info.SenderAlt] : [key.participant];
+  const candidates = info ? [info.Sender, info.SenderAlt] : [key.participant,key.participantAlt];
   const sender = candidates.find(value => config.senders.includes(value));
   if (group !== config.group || !config.senders.includes(sender)) return null;
   const id = info ? info.ID : key.id;
@@ -52,7 +61,7 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
   const reply = (body, status = 200) => Response.json(body, {status, headers: {'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer'}});
   if (!validWebhookKey(key, config.key)) return reply({error: 'Unauthorized'}, 401);
   if (request.method === 'GET') return reply({ok: true, service: 'SENDOBRA webhook', media: config.instanceToken && config.groqKey ? 'reading-enabled' : 'metadata-only'});
-  if (!config.secret || !config.serviceToken || !config.site || !config.group || !config.senders?.length) return reply({error: 'Receiver unavailable'}, 503);
+  if (!config.secret || !config.serviceToken || !config.site || !config.dynamicRouting&&(!config.group||!config.senders?.length)) return reply({error: 'Receiver unavailable'}, 503);
   if (!request.headers.get('content-type')?.startsWith('application/json')) return reply({error: 'JSON required'}, 415);
   const reader = request.body?.getReader();
   if (!reader) return reply({error: 'Body required'}, 400);
@@ -67,7 +76,7 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
     }
     raw = Buffer.concat(chunks).toString('utf8');
   } catch { return reply({error: 'Invalid body'}, 400); }
-  let event, body;
+  let event, body, candidates, directory;
   try {
     body = JSON.parse(raw); const data = body?.data, info = data?.Info, key = data?.key;
     const type = String(body?.event ?? body?.type ?? '').toLowerCase();
@@ -75,6 +84,7 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
     const content = data?.Message ?? data?.message;
     const marker = content?.conversation ?? content?.extendedTextMessage?.text;
     // Log only fixed classifications and booleans. Never log payloads, IDs, tokens or text.
+    const senders=config.senders||[];
     config.report?.({outcome:'received', bytes:Buffer.byteLength(raw), event:['message','messages.upsert'].includes(type)?'message':'other',
       envelope:info?'whatsmeow':key?'api':'other',
       instanceMatch:(body?.instance ?? body?.instanceName ?? config.instance) === config.instance,
@@ -82,14 +92,32 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
       chatType:typeof chat === 'string' ? chat.endsWith('@g.us')?'group':chat.endsWith('@newsletter')?'newsletter':'direct' : 'unknown',
       testMarker:typeof marker === 'string' && /teste\s+(?:final\s+)?evolution/i.test(marker),
       groupMatch:chat === config.group,
-      senderMatch:config.senders.includes(info?.Sender ?? key?.participant),
-      alternateMatch:config.senders.includes(info?.SenderAlt),
+      senderMatch:senders.includes(info?.Sender ?? key?.participant),
+      alternateMatch:senders.includes(info?.SenderAlt),
       own:(info?.IsFromMe ?? key?.fromMe) === true});
-    event = normalizeEvolution(body, config);
+    if(config.dynamicRouting){
+      if((body?.instance??body?.instanceName??config.instance)!==config.instance)return reply({ok:true,ignored:true});
+      if(['group','groupinfo','joinedgroup','groups.upsert','groups.update'].includes(type))directory=groupSummary(data?.GroupInfo??data,data?.groupJid);
+      if(!directory){candidates=[info?.Sender??key?.participant,info?.SenderAlt??key?.participantAlt].filter(senderId);if(!groupId(chat)||!candidates.length)return reply({ok:true,ignored:true});event=normalizeEvolution(body,{...config,group:chat,senders:candidates});}
+    }else event = normalizeEvolution(body, config);
   }
   catch { config.report?.({outcome:'invalid'}); return reply({error: 'Invalid event'}, 400); }
-  if (!event) { config.report?.({outcome:'ignored'}); return reply({ok: true, ignored: true}); }
+  if (!event&&!directory) { config.report?.({outcome:'ignored'}); return reply({ok: true, ignored: true}); }
   const signal=AbortSignal.timeout(50000);
+  if(config.dynamicRouting){
+    try{
+      const metadata=directory?{group:directory.id,name:directory.name}:{group:event.group,sender:candidates[0],alternate:candidates[1]};
+      const r=await signedRequest(config,'/api/whatsapp-routing',metadata,signal,fetchImpl);
+      if(!r.ok)throw Error('Routing unavailable');const result=await r.json();if(result.ok!==true)throw Error('Routing unavailable');
+      if(directory||result.authorized!==true||!candidates.includes(result.sender)){
+        // The first event can reveal the name of a group before it is authorized.
+        // This reads only group metadata, never downloads or sends message media.
+        if(!directory&&result.discoverName===true&&config.instanceToken){try{const info=await evolutionInfo('group-name',event.group,config.instanceToken,fetchImpl,AbortSignal.timeout(6000));if(info.name)await signedRequest(config,'/api/whatsapp-routing',{group:event.group,name:info.name},signal,fetchImpl);}catch{}}
+        config.report?.({outcome:directory?'group-discovered':'routing-denied'});return reply({ok:true,ignored:true});
+      }
+      event={...event,sender:result.sender};
+    }catch{config.report?.({outcome:'routing-failed'});return reply({error:'Routing pending'},503);}
+  }
   if(['audio','image'].includes(event.kind)) {
     try {event=await enrichMedia(event,body,config,fetchImpl,signal);config.report?.({outcome:'media-read',kind:event.kind});}
     catch(error){
@@ -100,15 +128,7 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
   // Expense interpretation stays inside the backend; no new external text processing.
   event={...event,expense_flow:1};
   try {
-    const base = new URL(config.site);
-    if (base.protocol !== 'https:') throw Error('HTTPS required');
-    const payload = JSON.stringify(event), time = String(Date.now());
-    const response = await fetchImpl(new URL('/api/whatsapp', base), {
-      method: 'POST', redirect: 'error', signal,
-      headers: {'Content-Type': 'application/json', 'OAI-Sites-Authorization': 'Bearer ' + config.serviceToken,
-        'X-Sendobra-Timestamp': time, 'X-Sendobra-Signature': 'v1=' + createHmac('sha256', config.secret).update(time + '.' + payload).digest('hex')},
-      body: payload,
-    });
+    const response = await signedRequest(config,'/api/whatsapp',event,signal,fetchImpl);
     if (!response.ok) { config.report?.({outcome:'backend-rejected',status:response.status}); return reply({error: 'Delivery pending'}, response.status === 403 ? 403 : 503); }
     const result = await response.json();
     if (result.ok !== true) return reply({error: 'Delivery pending'}, 503);
