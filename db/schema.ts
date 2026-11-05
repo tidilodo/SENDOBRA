@@ -1,5 +1,10 @@
 import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
 export const users = sqliteTable('users',{id:text('id').primaryKey(),name:text('name').notNull(),email:text('email').notNull().unique(),identity:text('identity').unique(),role:text('role').notNull(),active:integer('active').notNull().default(1),projects:text('projects').notNull().default('[]')});
+export const supabaseUserBindings = sqliteTable('supabase_user_bindings', {
+ subject: text('subject').primaryKey(),
+ user: text('user_id').notNull().unique().references(() => users.id),
+ created: text('created').notNull()
+});
 export const projects = sqliteTable('projects',{id:text('id').primaryKey(),name:text('name').notNull(),code:text('code').notNull().unique(),address:text('address').notNull(),status:text('status').notNull().default('active'),created:text('created').notNull()});
 export const suppliers = sqliteTable('suppliers',{id:text('id').primaryKey(),name:text('name').notNull(),contact:text('contact').notNull()});
 export const categories = sqliteTable('categories',{id:text('id').primaryKey(),name:text('name').notNull()});

@@ -36,6 +36,13 @@
       "when": 1793796014657,
       "tag": "0004_groups_by_project",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793880856300,
+      "tag": "0005_supabase_user_bindings",
+      "breakpoints": true
     }
   ]
 }

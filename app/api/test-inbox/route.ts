@@ -1,12 +1,12 @@
 import {env} from 'cloudflare:workers';
+import {registeredActor} from '../../request-actor';
 import {canProject} from '../../domain.mjs';
 import {possibleDuplicates} from '../../expense-domain.mjs';
 import {messageDraft} from '../../group-domain.mjs';
 export const dynamic='force-dynamic';
 const json=(body:any,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 export async function GET(r:Request){try{
- const identity=r.headers.get('oai-authenticated-user-id');if(!identity)return json({error:'Entre no SENDOBRA'},401);
- const db=env.DB!,u:any=await db.prepare('SELECT * FROM users WHERE identity=? AND active=1').bind(identity).first();if(!u)return json({error:'Acesso não autorizado'},403);
+ const u=await registeredActor(r);if(!u)return json({error:'Acesso não autorizado'},403);const db=env.DB!;
  const groups:any[]=(await db.prepare("SELECT g.*,COALESCE(s.mode,'general') mode FROM whatsapp_groups g LEFT JOIN whatsapp_group_settings s ON s.group_id=g.id").all()).results,allowed=groups.filter(g=>canProject(u,g.project));
  const ownSenders:any[]=(await db.prepare('SELECT id FROM whatsapp_senders WHERE user=?').bind(u.id).all()).results;
  const file=new URL(r.url).searchParams.get('file');

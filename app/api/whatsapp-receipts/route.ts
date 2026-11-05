@@ -1,8 +1,9 @@
 import {env} from 'cloudflare:workers';
+import {registeredOwner} from '../../request-actor';
 import {money,canProject} from '../../domain.mjs';
 export const dynamic='force-dynamic';
 const json=(body:any,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
-async function owner(r:Request){const identity=r.headers.get('oai-authenticated-user-id');if(!identity)return null;return env.DB!.prepare("SELECT * FROM users WHERE identity=? AND role='owner' AND active=1").bind(identity).first() as Promise<any>;}
+const owner=registeredOwner;
 export async function GET(r:Request){try{
  const u=await owner(r);if(!u)return json({error:'Somente proprietário autenticado'},403);
  const db=env.DB!,url=new URL(r.url),file=url.searchParams.get('file');

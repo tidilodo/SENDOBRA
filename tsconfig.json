@@ -49,6 +49,7 @@
     ".sites-runtime",
     "outputs",
     "work",
-    "deployment/vercel-app"
+    "deployment/vercel-app",
+    "deployment/admin-app"
   ]
 }

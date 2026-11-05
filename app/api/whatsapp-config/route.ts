@@ -1,8 +1,9 @@
 import {env} from 'cloudflare:workers';
+import {registeredOwner} from '../../request-actor';
 import {configureGroup,groupSettings} from '../../group-config';
 export const dynamic='force-dynamic';
 const json=(b:any,s=200)=>Response.json(b,{status:s,headers:{'Cache-Control':'no-store'}});
-async function owner(r:Request){const id=r.headers.get('oai-authenticated-user-id');if(!id)return null;return await env.DB!.prepare("SELECT * FROM users WHERE identity=? AND role='owner' AND active=1").bind(id).first();}
+const owner=registeredOwner;
 export async function GET(r:Request){try{if(!await owner(r))return json({error:'Somente proprietário autenticado'},403);const db=env.DB!;const connection:any=await db.prepare("SELECT state,updated FROM whatsapp_connection WHERE id='primary'").first();return json({configured:!!env.WHATSAPP_INGEST_SECRET,connection:connection&&Date.now()-Date.parse(connection.updated)<120000?connection:{state:'unknown',updated:connection?.updated||null},...await groupSettings(),senders:(await db.prepare('SELECT * FROM whatsapp_senders').all()).results,messages:(await db.prepare('SELECT id,kind,status,received,question,correlation,group_id FROM whatsapp_messages ORDER BY received DESC LIMIT 30').all()).results});}catch{return json({error:'Não foi possível carregar os grupos. Tente atualizar.'},503);}}
 export async function POST(r:Request){try{if(r.headers.get('origin')!==new URL(r.url).origin)return json({error:'Origem inválida'},403);const u:any=await owner(r);if(!u)return json({error:'Somente proprietário autenticado'},403);const raw=await r.text();if(raw.length>16000)return json({error:'Configuração muito grande'},413);const b:any=JSON.parse(raw),db=env.DB!;let q:any,before:any=null,after:any;
 if(['discover','status','members','connect_group','pause'].includes(b.action))return await configureGroup(b,u);

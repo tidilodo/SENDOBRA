@@ -1,10 +1,11 @@
 import {env} from 'cloudflare:workers';
+import {registeredOwner} from '../../request-actor';
 import {money,canProject} from '../../domain.mjs';
 import {validDate,possibleDuplicates} from '../../expense-domain.mjs';
 import {messageDraft} from '../../group-domain.mjs';
 export const dynamic='force-dynamic';
 const json=(value:any,status=200)=>Response.json(value,{status,headers:{'Cache-Control':'no-store'}});
-async function owner(request:Request){const id=request.headers.get('oai-authenticated-user-id');return id?env.DB!.prepare("SELECT * FROM users WHERE identity=? AND role='owner' AND active=1").bind(id).first() as Promise<any>:null;}
+const owner=registeredOwner;
 const textOf=(message:any)=>{const document=message.document?JSON.parse(message.document):{};return document.texto_original||(message.kind==='audio'&&message.question?.includes('\n')?message.question.split('\n').slice(1).join('\n'):'');};
 async function context(){
  const db=env.DB!;
