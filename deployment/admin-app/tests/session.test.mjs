@@ -8,5 +8,5 @@ test('encrypted sessions reject tampering, expiry and other server keys',()=>{
   assert.equal(openSession(value,key,1000).token,'private-access-token');
   assert.equal(openSession(value,key,3000),null);
   assert.equal(openSession(value,'b'.repeat(64),1000),null);
-  assert.equal(openSession('a'+value.slice(1),key,1000),null);
+  assert.equal(openSession((value[0]==='a'?'b':'a')+value.slice(1),key,1000),null);
 });
