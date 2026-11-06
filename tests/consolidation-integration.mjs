@@ -6,13 +6,14 @@ import {Miniflare} from 'miniflare';
 import {hash,sealBackup,openBackup,restoreIsolated} from '../scripts/backup-core.mjs';
 const script=(await build({entryPoints:['tests/fixtures/group-worker.ts'],bundle:true,write:false,format:'esm',platform:'neutral',external:['cloudflare:workers']})).outputFiles[0].text;
 const secret='isolated-integration-secret',base='http://fixture.test',auth={'oai-authenticated-user-id':'owner','oai-authenticated-user-email':'owner@fixture.test',Origin:base,'Content-Type':'application/json'};
-const mf=new Miniflare({modules:true,script,compatibilityDate:'2026-05-22',d1Databases:['DB'],r2Buckets:['BUCKET'],bindings:{WHATSAPP_INGEST_SECRET:secret}});
+const mf=new Miniflare({modules:true,script,compatibilityDate:'2026-05-22',d1Databases:['DB'],r2Buckets:['BUCKET'],bindings:{WHATSAPP_INGEST_SECRET:secret,BACKUP_EXPORT_SECRET:secret}});
 let target;const createTarget=()=>new Miniflare({modules:true,script:'export default {fetch(){return new Response("isolated")}}',compatibilityDate:'2026-05-22',d1Databases:['DB'],r2Buckets:['BUCKET']});
 async function req(path,b,h=auth){const r=await mf.dispatchFetch(base+path,{method:b?'POST':'GET',headers:h,body:b?JSON.stringify(b):undefined});return {status:r.status,data:await r.json()};}
 async function job(b){const raw=JSON.stringify(b),time=String(Date.now());return req('/api/whatsapp-jobs',b,{'Content-Type':'application/json','x-sendobra-timestamp':time,'x-sendobra-signature':'v1='+createHmac('sha256',secret).update(time+'.'+raw).digest('hex')});}
 try{
  console.log('Starting consolidation fixture');const db=await mf.getD1Database('DB'),bucket=await mf.getR2Bucket('BUCKET');for(const f of (await readdir('drizzle')).filter(x=>x.endsWith('.sql')).sort())for(const sql of (await readFile('drizzle/'+f,'utf8')).split('--> statement-breakpoint').map(s=>s.trim()).filter(Boolean))await db.prepare(sql).run();
- console.log('Schema ready');assert.equal((await req('/api/data')).status,200);const p=(await req('/api/data',{action:'projects',name:'Obra Alfa',code:'ALFA'})).data.id;
+ console.log('Schema ready');assert.equal((await req('/api/data')).status,200);const backupRaw=JSON.stringify({action:'begin'}),backupTime=String(Date.now());const serviceHeaders={Origin:base,'Content-Type':'application/json','x-backup-service-time':backupTime,'x-backup-service-signature':'v1='+createHmac('sha256',secret).update(backupTime+'.POST\n/api/backup\n'+backupRaw).digest('hex')};const serviceBackup=await req('/api/backup',{action:'begin'},serviceHeaders);assert.equal(serviceBackup.status,200,JSON.stringify(serviceBackup.data));await db.prepare("DELETE FROM maintenance_locks WHERE id='backup'").run();
+ const p=(await req('/api/data',{action:'projects',name:'Obra Alfa',code:'ALFA'})).data.id;
  await db.prepare("INSERT INTO users VALUES('employee','Equipe','e@fixture.test',NULL,'employee',1,?)").bind(JSON.stringify([p])).run();
  await db.prepare("INSERT INTO users VALUES('owner2','Outro proprietário','o2@fixture.test','owner2','owner',1,'[]')").run();
  const second={...auth,'oai-authenticated-user-id':'owner2','oai-authenticated-user-email':'o2@fixture.test'};
