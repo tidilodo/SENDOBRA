@@ -1,0 +1,23 @@
+name: Recover persisted WhatsApp events
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: sendobra-ingestion-recovery
+  cancel-in-progress: false
+jobs:
+  retry:
+    if: vars.SENDOBRA_RECOVERY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Retry bounded persisted batch
+        env:
+          RECOVERY_TOKEN: ${{ secrets.SENDOBRA_INGESTION_CRON_SECRET }}
+        run: |
+          test -n "$RECOVERY_TOKEN"
+          curl --silent --show-error --fail --max-time 65 \
+            --header "Authorization: Bearer $RECOVERY_TOKEN" \
+            https://sendobra.vercel.app/api/ingestion-cron

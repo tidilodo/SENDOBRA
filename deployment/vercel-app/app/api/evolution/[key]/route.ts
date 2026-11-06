@@ -9,6 +9,7 @@ async function webhook(request: Request, context: {params: Promise<{key: string}
     key: process.env.EVOLUTION_WEBHOOK_KEY,
     instance: 'tidi',
     dynamicRouting: true,
+    durable: true,
     secret: process.env.WHATSAPP_INGEST_SECRET,
     serviceToken: process.env.BRIDGE_SERVICE_TOKEN,
     site: process.env.BRIDGE_BACKEND_URL,

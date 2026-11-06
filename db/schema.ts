@@ -1,4 +1,8 @@
 import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
+export const financialVersions=sqliteTable('financial_versions',{record:text('record_id').primaryKey().references(()=>records.id),version:integer('version').notNull().default(0)});
+export const financialOperations=sqliteTable('financial_operations',{id:text('id').primaryKey(),actor:text('actor').notNull(),record:text('record_id').notNull().references(()=>records.id),fingerprint:text('fingerprint').notNull(),result:text('result').notNull(),created:text('created').notNull()});
+export const ingestionJobs=sqliteTable('ingestion_jobs',{id:text('id').primaryKey(),group:text('group_id').notNull(),sender:text('sender_id').notNull(),status:text('status').notNull().default('queued'),attempts:integer('attempts').notNull().default(0),available:integer('available').notNull(),lease:text('lease'),leaseUntil:integer('lease_until').notNull().default(0),payload:text('payload_key').notNull(),cache:text('cache_key'),error:text('error'),created:text('created').notNull(),updated:text('updated').notNull()},t=>[index('ingestion_jobs_due').on(t.status,t.available)]);
+export const maintenanceLocks=sqliteTable('maintenance_locks',{id:text('id').primaryKey(),owner:text('owner').notNull(),expires:integer('expires').notNull()});
 export const users = sqliteTable('users',{id:text('id').primaryKey(),name:text('name').notNull(),email:text('email').notNull().unique(),identity:text('identity').unique(),role:text('role').notNull(),active:integer('active').notNull().default(1),projects:text('projects').notNull().default('[]')});
 export const supabaseUserBindings = sqliteTable('supabase_user_bindings', {
  subject: text('subject').primaryKey(),

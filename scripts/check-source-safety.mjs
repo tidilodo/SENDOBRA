@@ -4,7 +4,7 @@ const paths = execFileSync('git', ['ls-files', '-z'], {encoding:'utf8'}).split('
 const findings = [];
 for (const path of paths) {
   if (/(^|\/)(node_modules|\.wrangler|\.sites-runtime|\.vercel)\//.test(path) || /(^|\/)\.env(?!\.example$)/.test(path) || /\.(sqlite\w*|pem|key)$/.test(path)) {findings.push(path); continue;}
-  if (/(^|\/)auth\//.test(path) && !/^deployment\/vercel-app\/app\/api\/auth\/(login|logout)\/route\.ts$/.test(path)) {findings.push(path); continue;}
+  if (/(^|\/)auth\//.test(path) && !/^deployment\/(?:vercel-app|admin-app)\/app\/api\/auth\/(login|logout)\/route\.ts$/.test(path)) {findings.push(path); continue;}
   if (statSync(path).size > 2_000_000) continue;
   const content = readFileSync(path, 'utf8');
   if (/gh[pousr]_[A-Za-z0-9]{25,}|art_v2_[A-Za-z0-9_]{15,}|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/.test(content)) findings.push(path);

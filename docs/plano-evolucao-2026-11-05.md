@@ -1,5 +1,15 @@
 # SENDOBRA — diagnóstico e plano para o próximo nível
 
+Roteiro consolidado: [Ciclo 1 — Consolidação operacional](roteiro-ciclo-1-consolidacao.md), com ordem de execução, dependências e critérios de liberação. Planejamento apenas.
+
+Detalhamento disponível: [B01 — Pendências sempre acessíveis](especificacao-pendencias-b01.md), especificação documental sem implementação.
+
+Detalhamento disponível: [B02/B03 — Aprovação e pagamento consistentes](especificacao-aprovacao-pagamento-b02-b03.md), especificação documental sem implementação.
+
+Detalhamento disponível: [B05 — Backup e restauração conjunta](especificacao-backup-restauracao-b05.md), especificação documental sem execução de backup ou restauração.
+
+Detalhamento disponível: [B18 — Homologação de áudio e imagem](especificacao-homologacao-midia-b18.md), plano documental sem testes novos em produção.
+
 Data de referência: 05/11/2026, America/Sao_Paulo. Versão documental 1.0.
 
 Mandato: analisar e documentar melhorias. Nenhuma recomendação deste documento autoriza implementação, contratação, migração ou publicação. Nesta etapa foi criado somente este relatório.

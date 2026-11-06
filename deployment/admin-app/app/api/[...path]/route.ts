@@ -2,7 +2,7 @@ import {currentSession} from '../../../lib/current-session';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 export const maxDuration=60;
-const allowed=new Set(['/api/data','/api/test-inbox','/api/expense-inbox','/api/whatsapp-config','/api/whatsapp-receipts']);
+const allowed=new Set(['/api/backup','/api/operations','/api/data','/api/test-inbox','/api/expense-inbox','/api/whatsapp-config','/api/whatsapp-receipts']);
 async function proxy(request:Request){
   const url=new URL(request.url);
   if(!allowed.has(url.pathname))return Response.json({error:'Rota indisponível'},{status:404});
@@ -20,7 +20,7 @@ async function proxy(request:Request){
       body=new Uint8Array(size);let offset=0;for(const chunk of chunks){body.set(chunk,offset);offset+=chunk.length;}
     }
     const headers=new Headers({Origin:upstream.origin,Authorization:'Bearer '+session.token,'OAI-Sites-Authorization':'Bearer '+service});
-    const type=request.headers.get('content-type');if(type)headers.set('Content-Type',type);
+    const backupToken=request.headers.get('x-backup-token');if(backupToken)headers.set('x-backup-token',backupToken);const type=request.headers.get('content-type');if(type)headers.set('Content-Type',type);
     const response=await fetch(upstream,{method:request.method,headers,body:body as BodyInit|undefined,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(50000)});
     const returned=new Headers({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});
     for(const name of ['content-type','content-disposition','content-security-policy']){const value=response.headers.get(name);if(value)returned.set(name,value);}

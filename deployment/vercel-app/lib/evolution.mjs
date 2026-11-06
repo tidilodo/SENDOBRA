@@ -1,3 +1,4 @@
+import {queueCall,processJob} from './durable-ingestion.mjs';
 import {createHmac, timingSafeEqual} from 'node:crypto';
 import {enrichMedia, MediaError} from './evolution-media.mjs';
 import {evolutionInfo,groupSummary} from './evolution-control.mjs';
@@ -117,6 +118,10 @@ export async function receiveEvolution(request, key, config, fetchImpl = fetch) 
       }
       event={...event,sender:result.sender};
     }catch{config.report?.({outcome:'routing-failed'});return reply({error:'Routing pending'},503);}
+  }
+  if(config.durable){
+    const id=event.group+':'+event.id;
+    try{const saved=await queueCall(config,{action:'enqueue',id,event,envelope:body},fetchImpl);if(saved.status!=='done')await processJob(config,id,fetchImpl).catch(()=>{});return reply({ok:true,accepted:true,duplicate:saved.duplicate===true});}catch{return reply({error:'Durable delivery unavailable'},503);}
   }
   if(['audio','image'].includes(event.kind)) {
     try {event=await enrichMedia(event,body,config,fetchImpl,signal);config.report?.({outcome:'media-read',kind:event.kind});}

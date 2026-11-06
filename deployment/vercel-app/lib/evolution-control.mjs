@@ -28,5 +28,5 @@ export async function receiveControl(request,config,fetchImpl=fetch){
  if(!/^\d{13}$/.test(time||'')||Math.abs(Date.now()-Number(time))>300000||!/^v1=[a-f0-9]{64}$/.test(signature||''))return reply({error:'Unauthorized'},401);
  const expected='v1='+createHmac('sha256',config.secret).update(time+'.'+raw).digest('hex');
  if(!timingSafeEqual(Buffer.from(signature),Buffer.from(expected)))return reply({error:'Unauthorized'},401);
- try{const b=JSON.parse(raw);if(!['groups','status','members'].includes(b.action)||b.action==='members'&&!groupId(b.group))return reply({error:'Invalid request'},400);return reply(await evolutionInfo(b.action,b.group,config.token,fetchImpl,AbortSignal.timeout(b.action==='groups'?8000:30000)));}catch{return reply({error:'Provider unavailable'},503);}
+ try{const b=JSON.parse(raw);if(b.action==='drain'&&config.drain)return reply(await config.drain());if(!['groups','status','members'].includes(b.action)||b.action==='members'&&!groupId(b.group))return reply({error:'Invalid request'},400);return reply(await evolutionInfo(b.action,b.group,config.token,fetchImpl,AbortSignal.timeout(b.action==='groups'?8000:30000)));}catch{return reply({error:'Provider unavailable'},503);}
 }

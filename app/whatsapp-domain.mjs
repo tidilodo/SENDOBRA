@@ -1,12 +1,12 @@
 import {money} from './domain.mjs';
-export function validateEvent(b){
+export function validateEvent(b,durableReplay=false){
  if(!b||typeof b!=='object'||Array.isArray(b))throw Error('Evento inválido');
  for(const [key,max] of [['id',200],['group',100],['sender',100]])if(typeof b[key]!=='string'||!b[key]||b[key].length>max)throw Error('Identificador inválido');
  if(!/^\d{5,30}@g\.us$/.test(b.group))throw Error('Grupo inválido');
  if(!/^\d{5,30}@(s\.whatsapp\.net|lid)$/.test(b.sender))throw Error('Remetente inválido');
  if(!['text','audio','image','document'].includes(b.kind))throw Error('Tipo inválido');
  if(typeof b.text!=='string'||b.text.length>4000)throw Error('Texto inválido');
- if(typeof b.timestamp!=='number'||!Number.isSafeInteger(b.timestamp)||Math.abs(Date.now()-b.timestamp)>86400000)throw Error('Mensagem fora da janela de 24 horas');
+ if(typeof b.timestamp!=='number'||!Number.isSafeInteger(b.timestamp)||(!durableReplay&&Math.abs(Date.now()-b.timestamp)>86400000))throw Error('Mensagem fora da janela de 24 horas');
  return {id:b.id,group:b.group,sender:b.sender,kind:b.kind,text:b.text,timestamp:b.timestamp};
 }
 export function parseText(text){
