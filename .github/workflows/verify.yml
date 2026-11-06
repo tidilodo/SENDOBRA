@@ -15,6 +15,7 @@ jobs:
       - run: node scripts/check-source-safety.mjs
       - run: npm ci --include=dev --include=optional --no-audit --no-fund
       - run: node --test tests/domain.test.mjs tests/whatsapp.test.mjs tests/expense.test.mjs deployment/vercel-app/tests/evolution.test.mjs deployment/vercel-app/tests/evolution-media.test.mjs deployment/vercel-app/tests/evolution-control.test.mjs deployment/vercel-app/tests/durable-ingestion.test.mjs deployment/admin-app/tests/session.test.mjs adapter/test.mjs adapter/audio-engine.test.mjs tests/receipts.test.mjs deployment/vercel-app/tests/session.test.mjs
+      - run: node --test tests/backup-cli.test.mjs
       - run: node tests/consolidation-integration.mjs
       - run: node tests/whatsapp-groups-integration.mjs
       - run: npx --no-install tsc --noEmit
