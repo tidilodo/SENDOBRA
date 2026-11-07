@@ -73,3 +73,26 @@ button:focus-visible,a:focus-visible,.upload:focus-within{outline:2px solid #427
  .admin-login{padding:20px 14px}
 }
 @media(max-width:360px){.metrics{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.records-table tr{grid-template-columns:1fr}}
+
+/* Work identification: location is a suggestion, confirmed by the person. */
+.geo-panel{padding:20px 24px;margin-bottom:22px}
+.geo-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.geo-heading h2{display:flex;align-items:center;gap:8px}
+.geo-heading p,.geo-settings p,.geo-help{font-size:13px;color:#52666b;line-height:1.6;margin:8px 0}
+.geo-panel label{display:grid;gap:7px;font-size:13px;color:#435b60}
+.geo-panel select,.geo-panel input:not([type=checkbox]){width:100%;padding:12px;border:1px solid #bdcec6;border-radius:8px;background:white;font:inherit;min-height:44px}
+.geo-select{margin:14px 0;max-width:500px}
+.geo-settings{margin-top:18px;border-top:1px solid #e0e8e4;padding-top:16px}
+.geo-settings summary{cursor:pointer;font-size:14px;color:#285e4a;min-height:44px;align-content:center}
+.geo-settings form{display:grid;gap:16px;margin-top:16px;padding:0}
+.geo-settings form>button{justify-self:start}
+.geo-fields{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.geo-panel .geo-check{display:flex;align-items:center;gap:10px}
+.geo-check input{width:20px;height:20px}
+.geo-results{padding:16px;background:#f0f6ed;border:1px solid #d4e1ce;border-radius:8px;margin:14px 0}
+.geo-results>p{font-size:14px;line-height:1.6}
+.geo-candidate{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 0;border-top:1px solid #d4e1ce;margin-top:12px}
+.geo-candidate div{min-width:0;overflow-wrap:anywhere}
+.geo-panel small{color:#52666b;font-size:12px}
+.dialog .geo-panel{margin:0;padding:14px}
+@media(max-width:760px){.geo-panel{padding:16px}.geo-heading>button,.geo-select{width:100%;max-width:none}.geo-heading>button{justify-content:center}.geo-fields{grid-template-columns:1fr}.geo-settings form>button{width:100%;justify-content:center}.geo-candidate button{width:100%;justify-content:center}}
