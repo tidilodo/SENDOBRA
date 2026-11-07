@@ -44,3 +44,14 @@ Esta entrega implementa geolocalizacao no painel existente. O campo de mensagens
 
 Publicacao de producao concluida em 07/11/2026: https://zapiobra-admin.vercel.app/ . Build remoto aprovado. Rota nova recusou acesso sem sessao (HTTP 401); login respondeu HTTP 200.
 
+
+## Atualizacao: cadastro por CEP, endereco e mapa
+
+Fluxo principal em Obras > Configurar localizacao das obras: selecionar obra, informar CEP e tocar em Buscar CEP, preencher numero/lote/quadra, conferir ou ajustar o ponto no mapa e confirmar antes de salvar. O endereco estruturado fica junto ao ponto da obra no armazenamento privado.
+
+Consulta de CEP por ViaCEP e BrasilAPI, somente por toque, sem autocomplete. Coordenadas do CEP sao aproximadas e podem estar ausentes. Nunca sao tratadas como local exato do numero informado. O usuario pode tocar no mapa ou arrastar o marcador. Sem ponto disponivel, ha link externo para consultar o endereco e opcao de coordenadas/GPS.
+
+Mapa Leaflet com tiles OpenStreetMap, atribuicao visivel, cache HTTP normal, sem prefetch ou uso offline. NEXT_PUBLIC_MAP_TILE_URL permite trocar o provedor de tiles.
+
+Doze testes de sessao, geolocalizacao e endereco passaram, incluindo falha de provedores, CEP invalido e coordenadas ausentes. TypeScript aprovado. A experiencia de permissao GPS e arraste no celular real ainda precisa de verificacao.
+

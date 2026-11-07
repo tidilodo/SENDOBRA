@@ -9,3 +9,13 @@
 /* Readable secondary text on the presentation surfaces. */
 .demo-modes button{color:#52664f}.demo-chat-head small{color:#53664f}.demo-fields dt{color:#5e7060}.demo-attachment small{color:#556b4c}.demo-flow-footer>p{color:#56684f}.demo-chat-caption{color:#53664f}.demo-chat-day{color:#52624e}.demo-message-time{color:#5c6d5b}.demo-photo>span{color:#57624e}.demo-wave span{color:#53664f}
 .expense-summary{background:#f2f6ef;border:1px solid #d7e2d5;border-radius:10px;padding:20px;margin:18px 0}.expense-summary h3{font-size:16px;margin-bottom:16px}.expense-summary dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:0 0 18px}.expense-summary dt{font-size:11px;color:#52665e;margin-bottom:5px}.expense-summary dd{margin:0;font-size:14px;overflow-wrap:anywhere}.expense-summary ul{padding-left:20px;line-height:1.7}.expense-summary>p{font-size:12px;line-height:1.7;margin-bottom:0}.expense-summary-warning{color:#77531d;font-weight:600}@media(max-width:600px){.expense-summary dl{grid-template-columns:1fr}}
+
+
+/* Official supplied logo; CSS frames its transparent canvas without editing the asset. */
+.official-logo{position:relative;display:block;aspect-ratio:1530/504;width:100%;overflow:hidden}
+.official-logo img{position:absolute;display:block;width:125.4902%;height:253.9683%;max-width:none;left:-12.7451%;top:-73.6111%}
+.brand{display:block;padding:10px 9px;background:#fff;border-radius:10px;letter-spacing:normal;flex-shrink:0}
+.brand .official-logo{width:100%}
+.login-brand{width:100%;max-width:330px;margin:0 auto 28px;padding:8px;background:white;border-radius:8px}
+@media(max-width:760px){.brand{width:192px;max-width:calc(100% - 86px);padding:8px}.login-brand{max-width:300px;margin-bottom:24px}}
+.brand>.official-logo{margin:0}

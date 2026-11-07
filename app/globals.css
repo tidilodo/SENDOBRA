@@ -72,3 +72,13 @@ button:focus-visible,a:focus-visible,.upload:focus-within{outline:2px solid #427
  .admin-login{padding:20px 14px}
 }
 @media(max-width:360px){.metrics{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.records-table tr{grid-template-columns:1fr}}
+
+
+/* Official supplied logo; CSS frames its transparent canvas without editing the asset. */
+.official-logo{position:relative;display:block;aspect-ratio:1530/504;width:100%;overflow:hidden}
+.official-logo img{position:absolute;display:block;width:125.4902%;height:253.9683%;max-width:none;left:-12.7451%;top:-73.6111%}
+.brand{display:block;padding:10px 9px;background:#fff;border-radius:10px;letter-spacing:normal;flex-shrink:0}
+.brand .official-logo{width:100%}
+.login-brand{width:100%;max-width:330px;margin:0 auto 28px;padding:8px;background:white;border-radius:8px}
+@media(max-width:760px){.brand{width:192px;max-width:calc(100% - 86px);padding:8px}.login-brand{max-width:300px;margin-bottom:24px}}
+.brand>.official-logo{margin:0}
