@@ -41,3 +41,6 @@ O backend Sites/D1 e os fluxos de WhatsApp e financeiro nao foram alterados.
 - GPS real e permissao em aparelho fisico ainda precisam de validacao com o usuario na obra.
 
 Esta entrega implementa geolocalizacao no painel existente. O campo de mensagens, gravacao de audio e envio por link foi estudado e permanece uma etapa separada.
+
+Publicacao de producao concluida em 07/11/2026: https://zapiobra-admin.vercel.app/ . Build remoto aprovado. Rota nova recusou acesso sem sessao (HTTP 401); login respondeu HTTP 200.
+
