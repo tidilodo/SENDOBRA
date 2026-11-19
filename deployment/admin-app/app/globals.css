@@ -164,3 +164,26 @@ button:focus-visible,a:focus-visible,.upload:focus-within{outline:2px solid #427
 .archived-works{margin-top:16px}
 .archived-works summary{cursor:pointer;font-weight:700}
 .archived-works>div{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:12px}
+
+.geo-privacy-mobile{display:none}
+@media(max-width:760px){
+ .admin-shell aside{padding-inline:16px;gap:6px}
+ .admin-shell aside .brand{width:144px;padding:5px;min-height:0}
+ .admin-shell aside .mobile-menu-toggle{min-height:44px}
+ .admin-shell aside .company-with-whatsapp{padding:0;border:0;margin:0}
+ .admin-shell aside .company-with-whatsapp>span,.admin-shell aside .company-with-whatsapp small{display:none}
+ .admin-shell aside .company-with-whatsapp>div{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px}
+ .admin-shell .wa-sidebar-status{margin:0}
+ .admin-shell main{padding-inline:16px}
+ .admin-shell .admin-home .geo-panel{display:flex;flex-direction:column;gap:8px;padding:12px 16px;margin-bottom:12px}
+ .admin-shell .admin-home .geo-heading{display:contents}
+ .admin-shell .admin-home .geo-heading>div,.admin-shell .admin-home .geo-settings,.admin-shell .admin-home .geo-help{display:none}
+ .admin-shell .admin-home .geo-select{order:-1;width:100%;margin:0;font-weight:700}
+ .admin-shell .admin-home .geo-heading>button{width:max-content;max-width:100%;margin:0;padding:6px 10px}
+ .admin-shell .admin-home .geo-privacy-mobile{display:block;font-size:13px;color:#435b53}
+ .admin-shell .admin-home .geo-privacy-mobile p{margin:4px 0}
+ .admin-shell .workspace :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea){background:#eef4f0;color:#18372b;border:1px solid #6f887b;border-radius:8px}
+ .admin-shell .workspace :is(input,select,textarea):focus-visible{outline:2px solid #28724c;outline-offset:2px}
+ .admin-shell .workspace input::placeholder,.admin-shell .workspace textarea::placeholder{color:#52685c;opacity:1}
+ .admin-shell .mobile-tabs button:not([aria-current]){color:#405b51}
+}
