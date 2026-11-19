@@ -193,3 +193,30 @@ button:focus-visible,a:focus-visible,.upload:focus-within{outline:2px solid #427
 .admin-login .password-control input{width:100%;padding-right:54px}
 .admin-login .password-control button{position:absolute;inset:0 0 0 auto;min-width:44px;justify-content:center;border:0;background:transparent;color:#234a3b}
 .admin-login input{background:#eef4f0;border-color:#6f887b;color:#18372b}
+
+.admin-shell{
+ --brand-navy:#12223c;
+ --brand-navy-light:#263a58;
+ --brand-orange:#ed832d;
+ --brand-orange-ink:#864114;
+}
+.admin-shell>aside{background:var(--brand-navy);color:#d0d9e6}
+.admin-shell>aside .brand{background:#fff}
+.admin-shell>aside :is(.mobile-menu-toggle,.wa-sidebar-status button){background:var(--brand-navy-light);border-color:#74829a}
+.admin-shell>aside nav button:hover{background:var(--brand-navy-light)}
+.admin-shell>aside nav button.selected{background:var(--brand-navy-light);color:#fff3e7;box-shadow:inset 3px 0 var(--brand-orange)}
+.admin-shell .workspace .primary,.admin-shell .overlay .primary{background:var(--brand-navy);border-color:var(--brand-navy)}
+.admin-shell .workspace .primary:hover,.admin-shell .overlay .primary:hover{background:var(--brand-navy-light)}
+.admin-shell .workspace .eyebrow{color:var(--brand-orange-ink)}
+.admin-shell .workspace .integration-card{background:var(--brand-navy)}
+.aside-copyright{display:block;margin-top:12px;color:#c6d1e1;font-size:11px;letter-spacing:.04em}
+@media(min-width:761px){
+ .admin-shell>aside{padding-top:0}
+ .admin-shell>aside .brand{margin:0 -18px;padding:14px 18px;border-radius:0}
+ .admin-shell>aside nav{min-height:0;overflow-y:auto;padding-bottom:16px}
+ .admin-shell>aside nav button{flex-shrink:0}
+ .admin-shell>aside .aside-bottom{flex-shrink:0;padding-top:14px;border-top:1px solid #ffffff30}
+}
+@media(max-width:760px){
+ .admin-shell .mobile-tabs button[aria-current="page"]{background:#ffecd9;color:#713710}
+}
