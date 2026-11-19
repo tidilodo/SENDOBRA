@@ -187,3 +187,9 @@ button:focus-visible,a:focus-visible,.upload:focus-within{outline:2px solid #427
  .admin-shell .workspace input::placeholder,.admin-shell .workspace textarea::placeholder{color:#52685c;opacity:1}
  .admin-shell .mobile-tabs button:not([aria-current]){color:#405b51}
 }
+
+.admin-login .password-field{display:grid;gap:6px;min-width:0}
+.admin-login .password-control{position:relative}
+.admin-login .password-control input{width:100%;padding-right:54px}
+.admin-login .password-control button{position:absolute;inset:0 0 0 auto;min-width:44px;justify-content:center;border:0;background:transparent;color:#234a3b}
+.admin-login input{background:#eef4f0;border-color:#6f887b;color:#18372b}
