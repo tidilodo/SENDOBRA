@@ -118,3 +118,16 @@ button:focus-visible,a:focus-visible,.upload:focus-within{outline:2px solid #427
 .login-brand{width:100%;max-width:330px;margin:0 auto 28px;padding:8px;background:white;border-radius:8px}
 @media(max-width:760px){.brand{width:192px;max-width:calc(100% - 86px);padding:8px}.login-brand{max-width:300px;margin-bottom:24px}}
 .brand>.official-logo{margin:0}
+
+.wa-sidebar-status{display:flex;align-items:center;gap:8px;margin-top:5px}
+.wa-status-dot{width:10px;height:10px;border-radius:50%;background:#a8b8b9}
+.wa-status-dot[data-state="connected"]{background:#58dc92}
+.wa-status-dot[data-state="disconnected"]{background:#ff747e}
+.wa-sidebar-status button{justify-content:center;width:32px;height:32px;padding:0;background:#25464a;border-color:#597579;color:#fff}
+.wa-sidebar-status button:hover:not(:disabled){background:#32595d}
+.wa-sidebar-status button:focus-visible{outline-color:#a1e3bf}
+@media(max-width:760px){
+ .company-with-whatsapp{display:flex;order:1;width:100%;margin:2px 0 0;padding-bottom:8px}
+ .wa-sidebar-status button{width:44px;height:44px}
+ aside nav,aside .aside-bottom{order:2}
+}
