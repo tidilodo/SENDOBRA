@@ -220,3 +220,12 @@ button:focus-visible,a:focus-visible,.upload:focus-within{outline:2px solid #427
 @media(max-width:760px){
  .admin-shell .mobile-tabs button[aria-current="page"]{background:#ffecd9;color:#713710}
 }
+
+.admin-brand-row{display:contents}
+@media(max-width:760px){
+ .admin-shell>aside{padding-top:0}
+ .admin-shell>aside .admin-brand-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:0 0 calc(100% + 32px);margin-inline:-16px;padding:max(8px,env(safe-area-inset-top)) 16px 8px;background:#fff}
+ .admin-shell>aside .admin-brand-row .brand{padding:0;border-radius:0}
+ .admin-shell>aside .admin-brand-row .mobile-menu-toggle{width:44px;height:44px;flex:0 0 44px;justify-content:center;padding:0;background:var(--brand-navy);border-color:var(--brand-navy);color:#fff}
+ .admin-shell>aside .admin-brand-row .mobile-menu-toggle:focus-visible{outline-color:var(--brand-navy)}
+}
