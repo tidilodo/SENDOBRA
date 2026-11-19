@@ -15,9 +15,24 @@ export async function GET(r:Request){try{const u=await actor(r),url=new URL(r.ur
 export async function POST(r:Request){try{if(r.headers.get('origin')!==new URL(r.url).origin)throw Error('403:Origem inválida');const u=await actor(r);if(r.headers.get('content-type')?.includes('multipart/form-data')){const form=await r.formData(),file=form.get('file') as File,id=String(form.get('record'));const rec:any=await db().prepare('SELECT * FROM records WHERE id=?').bind(id).first();if(!rec||!canProject(u,rec.project))throw Error('403:Acesso negado');if(!file||file.size>10*1024*1024||file.size===0)throw Error('Arquivo deve ter até 10 MB.');const bytes=await file.arrayBuffer(),v=new Uint8Array(bytes);const mime=v[0]===37&&v[1]===80&&v[2]===68&&v[3]===70?'application/pdf':v[0]===137&&v[1]===80&&v[2]===78&&v[3]===71?'image/png':v[0]===255&&v[1]===216&&v[2]===255?'image/jpeg':null;if(!mime||mime!==file.type)throw Error('Apenas PDF, PNG e JPEG válidos.');const aid=crypto.randomUUID(),hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(x=>x.toString(16).padStart(2,'0')).join('');await env.BUCKET!.put(aid,bytes);try{await db().batch([db().prepare('INSERT INTO attachments VALUES(?,?,?,?,?,?,?,?)').bind(aid,id,file.name.slice(0,200),mime,file.size,hash,u.id,new Date().toISOString()),log(u,'attachment.create',aid,null,{record:id,hash})]);}catch(e){await env.BUCKET!.delete(aid);throw e;}return json({ok:true});}
 const b:any=await r.json();const action=field(b,'action');let id=crypto.randomUUID();const now=new Date().toISOString();let q:any;
 if(['projects','suppliers','categories','users'].includes(action)){if(u.role!=='owner')throw Error('403:Somente proprietário');if(action==='projects')q=db().prepare('INSERT INTO projects VALUES(?,?,?,?,?,?)').bind(id,field(b,'name'),field(b,'code',40),String(b.address||'').slice(0,500),'active',now);if(action==='suppliers')q=db().prepare('INSERT INTO suppliers VALUES(?,?,?)').bind(id,field(b,'name'),String(b.contact||'').slice(0,200));if(action==='categories')q=db().prepare('INSERT INTO categories VALUES(?,?)').bind(id,field(b,'name'));if(action==='users'){if(!['owner','manager','foreman','employee'].includes(b.role))throw Error('Cargo inválido');if(b.role==='owner'&&b.confirm_owner!==true)throw Error('Confirme explicitamente a concessão de acesso total.');const email=field(b,'email',200).toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw Error('E-mail inválido');const p=Array.isArray(b.projects)?b.projects:[];const known=await all('projects');if(p.some((id:any)=>!known.some(k=>k.id===id)))throw Error('Obra inválida');q=db().prepare('INSERT INTO users VALUES(?,?,?,?,?,?,?)').bind(id,field(b,'name'),email,null,b.role,1,JSON.stringify(p));}}
+else if(action==='archive_project'||action==='restore_project'){
+  if(u.role!=='owner')throw Error('403:Somente proprietário');
+  const project=field(b,'project');
+  const current:any=await db().prepare('SELECT id,status FROM projects WHERE id=?').bind(project).first();
+  if(!current)throw Error('404:Obra não encontrada');
+  const status=action==='archive_project'?'archived':'active';
+  if(current.status===status)return json({ok:true});
+  await db().batch([
+    db().prepare('UPDATE projects SET status=? WHERE id=?').bind(status,project),
+    ...(status==='archived'?[db().prepare('UPDATE whatsapp_groups SET active=0 WHERE project=?').bind(project)]:[]),
+    log(u,status==='archived'?'project.archive':'project.restore',project,{status:current.status},{status}),
+  ]);
+  return json({ok:true});
+}
 else if(action==='record'){
   const project=field(b,'project');
   if(!canProject(u,project))throw Error('403:Obra não autorizada');
+  if(!await db().prepare("SELECT id FROM projects WHERE id=? AND status='active'").bind(project).first())throw Error('409:Selecione uma obra ativa.');
   if(!['expense','income','operation'].includes(b.type))throw Error('Tipo inválido');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(b.date)||Number.isNaN(Date.parse(b.date)))throw Error('Data inválida');
   const status=b.type==='operation'||['owner','manager'].includes(u.role)?'approved':'pending_approval';
