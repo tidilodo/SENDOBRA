@@ -5,7 +5,6 @@ type Link={sender:string;user:string};
 type Member={sender:string;phone:string;name:string};
 const date=(value:string)=>new Date(value).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'});
 const memberLabel=(m:Member)=>[m.name,m.phone?'+'+m.phone:''].filter(Boolean).join(' · ')||'Participante sem nome';
-const stateLabel:Record<string,string>={connected:'WhatsApp conectado',connecting:'Conectando',pairing_required:'Pareamento necessário',disconnected:'WhatsApp desconectado',unknown:'Conexão ainda não verificada'};
 
 export default function WhatsAppSetup({data,initialProject='',onSaved,onReview}:{data:any;initialProject?:string;onSaved?:()=>Promise<void>;onReview?:()=>void}){
  const [state,S]=useState<any>(),[error,E]=useState(''),[notice,N]=useState(''),[busy,B]=useState(''),[show,Show]=useState(!!initialProject);
@@ -24,11 +23,10 @@ export default function WhatsAppSetup({data,initialProject='',onSaved,onReview}:
  const directory=(state?.directory||[]).filter((g:any)=>!state.groups.some((saved:any)=>saved.id===g.id));
  const selected=state?.senders.find((s:any)=>s.id===sender);
  return <section className="panel settings whatsapp-setup" aria-labelledby="groups-title">
-  <div className="wa-groups-head"><div><h2 id="groups-title"><MessageCircle size={19}/> Grupos do WhatsApp por obra</h2><p>Conecte os grupos que a equipe já usa. As mensagens autorizadas chegam à conferência da obra.</p></div><button type="button" disabled={!!busy} onClick={()=>run('status',async()=>{await call('status');await load();N('Conexão verificada.');})}><RefreshCw size={15}/>{busy==='status'?'Verificando…':'Verificar conexão'}</button></div>
+  <div className="wa-groups-head"><div><h2 id="groups-title"><MessageCircle size={19}/> Grupos do WhatsApp por obra</h2><p>Conecte os grupos que a equipe já usa. As mensagens autorizadas chegam à conferência da obra.</p></div></div>
   {error&&<div role="alert" className="alert error">{error}</div>}{notice&&<div role="status" className="alert success">{notice}</div>}
   {!state&&!error&&<p role="status">Carregando grupos…</p>}{!state&&error&&<button disabled={!!busy} onClick={()=>run('reload',async()=>{await load();})}>Atualizar painel</button>}
   {state&&<>
-   <div className="wa-connection"><span className={'badge '+(state.connection.state==='connected'?'approved':'')}>{stateLabel[state.connection.state]||stateLabel.unknown}</span>{state.connection.updated&&<small>Verificado em {date(state.connection.updated)}</small>}</div>
    <div className="wa-groups-list" aria-label="Grupos vinculados">
     {state.groups.length===0&&<p>Adicione o número dedicado ao primeiro grupo da obra e conecte-o abaixo.</p>}
     {state.groups.map((g:any)=><article key={g.id} className="wa-group-row"><div><strong>{displayGroup(g)}</strong><small>{g.mode==='general'?'Grupo geral de teste':projectName(g.project)}</small></div><div><span className={'badge '+(g.active?'approved':'')}>{g.active?'Recebimento ativo':'Pausado'}</span><small>{g.last_received?'Último recebimento: '+date(g.last_received):'Aguardando a primeira mensagem'}</small></div><div><strong>{g.pending||0}</strong><small>em conferência</small></div><div className="wa-group-actions">{!!g.pending&&onReview&&<button type="button" onClick={onReview}>Conferir</button>}{g.mode==='project'&&<button type="button" disabled={!!busy} onClick={()=>{reset(g.id,g.project,true);Show(true);run('members',()=>participants(g.id,true));}}>Editar remetentes</button>}<button type="button" disabled={!!busy} onClick={()=>run('pause',async()=>{await call('pause',{group:g.id,active:!g.active});await load();await onSaved?.();N(g.active?'Recebimento pausado. O histórico foi preservado.':'Recebimento reativado.');})}>{g.active?<Pause size={14}/>:<Play size={14}/>} {g.active?'Pausar':'Reativar'}</button></div></article>)}
