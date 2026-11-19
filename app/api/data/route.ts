@@ -13,9 +13,40 @@ function field(b:any,k:string,max=300){const s=String(b[k]??'').trim();if(!s||s.
 function fail(e:any){const m=e.message||'Falha na operação';return json({error:m.replace(/^\d{3}:/,'')},/^401/.test(m)?401:/^403/.test(m)?403:/^409/.test(m)?409:/^404/.test(m)?404:400);}
 export async function GET(r:Request){try{const u=await actor(r),url=new URL(r.url);if(url.searchParams.has('file')){const a:any=await db().prepare('SELECT * FROM attachments WHERE id=?').bind(url.searchParams.get('file')).first();const rec:any=a&&await db().prepare('SELECT * FROM records WHERE id=?').bind(a.record).first();if(!rec||!canProject(u,rec.project))throw Error('403:Acesso negado');const f=await env.BUCKET!.get(a.id);if(!f)return json({error:'Arquivo indisponível'},404);await log(u,'attachment.read',a.id,null,null).run();return new Response(f.body,{headers:{'Content-Type':a.mime,'Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(a.name)}`,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});}const versions=(await all('financial_versions'));const projects=(await all('projects')).filter(p=>canProject(u,p.id)),records=(await all('records')).filter(p=>canProject(u,p.project));return json({user:u,projects,records:records.map(r=>({...r,version:versions.find(v=>v.record_id===r.id)?.version||0})),whatsappGroups:u.role==='owner'?await groupStats():[],suppliers:(await all('suppliers')).filter(s=>u.role==='owner'||records.some(r=>r.supplier===s.id)),categories:await all('categories'),users:u.role==='owner'?await all('users'):[{id:u.id,name:u.name,role:u.role}],attachments:(await all('attachments')).filter(a=>records.some(r=>r.id===a.record)),audit:u.role==='owner'?(await all('audit')).sort((a,b)=>b.created.localeCompare(a.created)):[]});}catch(e){return fail(e);}}
 export async function POST(r:Request){try{if(r.headers.get('origin')!==new URL(r.url).origin)throw Error('403:Origem inválida');const u=await actor(r);if(r.headers.get('content-type')?.includes('multipart/form-data')){const form=await r.formData(),file=form.get('file') as File,id=String(form.get('record'));const rec:any=await db().prepare('SELECT * FROM records WHERE id=?').bind(id).first();if(!rec||!canProject(u,rec.project))throw Error('403:Acesso negado');if(!file||file.size>10*1024*1024||file.size===0)throw Error('Arquivo deve ter até 10 MB.');const bytes=await file.arrayBuffer(),v=new Uint8Array(bytes);const mime=v[0]===37&&v[1]===80&&v[2]===68&&v[3]===70?'application/pdf':v[0]===137&&v[1]===80&&v[2]===78&&v[3]===71?'image/png':v[0]===255&&v[1]===216&&v[2]===255?'image/jpeg':null;if(!mime||mime!==file.type)throw Error('Apenas PDF, PNG e JPEG válidos.');const aid=crypto.randomUUID(),hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(x=>x.toString(16).padStart(2,'0')).join('');await env.BUCKET!.put(aid,bytes);try{await db().batch([db().prepare('INSERT INTO attachments VALUES(?,?,?,?,?,?,?,?)').bind(aid,id,file.name.slice(0,200),mime,file.size,hash,u.id,new Date().toISOString()),log(u,'attachment.create',aid,null,{record:id,hash})]);}catch(e){await env.BUCKET!.delete(aid);throw e;}return json({ok:true});}
-const b:any=await r.json();const action=field(b,'action'),id=crypto.randomUUID(),now=new Date().toISOString();let q:any;
+const b:any=await r.json();const action=field(b,'action');let id=crypto.randomUUID();const now=new Date().toISOString();let q:any;
 if(['projects','suppliers','categories','users'].includes(action)){if(u.role!=='owner')throw Error('403:Somente proprietário');if(action==='projects')q=db().prepare('INSERT INTO projects VALUES(?,?,?,?,?,?)').bind(id,field(b,'name'),field(b,'code',40),String(b.address||'').slice(0,500),'active',now);if(action==='suppliers')q=db().prepare('INSERT INTO suppliers VALUES(?,?,?)').bind(id,field(b,'name'),String(b.contact||'').slice(0,200));if(action==='categories')q=db().prepare('INSERT INTO categories VALUES(?,?)').bind(id,field(b,'name'));if(action==='users'){if(!['owner','manager','foreman','employee'].includes(b.role))throw Error('Cargo inválido');if(b.role==='owner'&&b.confirm_owner!==true)throw Error('Confirme explicitamente a concessão de acesso total.');const email=field(b,'email',200).toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw Error('E-mail inválido');const p=Array.isArray(b.projects)?b.projects:[];const known=await all('projects');if(p.some((id:any)=>!known.some(k=>k.id===id)))throw Error('Obra inválida');q=db().prepare('INSERT INTO users VALUES(?,?,?,?,?,?,?)').bind(id,field(b,'name'),email,null,b.role,1,JSON.stringify(p));}}
-else if(action==='record'){const project=field(b,'project');if(!canProject(u,project))throw Error('403:Obra não autorizada');if(!['expense','income','operation'].includes(b.type))throw Error('Tipo inválido');if(!/^\d{4}-\d{2}-\d{2}$/.test(b.date)||Number.isNaN(Date.parse(b.date)))throw Error('Data inválida');const status=b.type==='operation'?'approved':['owner','manager'].includes(u.role)?'approved':'pending_approval';q=db().prepare('INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,project,u.id,field(b,'description',1000),b.type==='operation'?null:money(b.amount),b.type,String(b.category||'Sem categoria'),b.supplier||null,b.date,status,'unreported',now);}
+else if(action==='record'){
+  const project=field(b,'project');
+  if(!canProject(u,project))throw Error('403:Obra não autorizada');
+  if(!['expense','income','operation'].includes(b.type))throw Error('Tipo inválido');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(b.date)||Number.isNaN(Date.parse(b.date)))throw Error('Data inválida');
+  const status=b.type==='operation'||['owner','manager'].includes(u.role)?'approved':'pending_approval';
+  const input={
+    project,description:field(b,'description',1000),amount:b.type==='operation'?null:money(b.amount),
+    type:b.type,category:String(b.category||'Sem categoria'),supplier:b.supplier||null,date:b.date,
+  };
+  if(b.request_id!==undefined){
+    if(typeof b.request_id!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(b.request_id))throw Error('Identificador de envio inválido.');
+    id='manual:'+u.id+':'+b.request_id.toLowerCase();
+  }
+  q=db().prepare('INSERT INTO records VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(
+    id,project,u.id,input.description,input.amount,input.type,input.category,input.supplier,input.date,status,'unreported',now,
+  );
+  if(b.request_id!==undefined){
+    try{
+      await db().batch([q,log(u,'record.create',id,null,input)]);
+      return json({ok:true,id,status});
+    }catch(error){
+      // The record and its original submission are committed in the same batch.
+      const saved=await db().prepare(
+        "SELECT r.status,a.after AS submission FROM records r JOIN audit a ON a.entity=r.id WHERE r.id=? AND a.action='record.create'",
+      ).bind(id).first<{status:string;submission:string}>();
+      if(!saved)throw error;
+      if(saved.submission!==JSON.stringify(input))throw Error('409:Este envio já foi usado para outro lançamento.');
+      return json({ok:true,id,status:saved.status});
+    }
+  }
+}
 else if(action==='decision'||action==='payment'){if(b.payment==='payment_evidenced'){const a:any=await db().prepare('SELECT id FROM attachments WHERE id=? AND record=?').bind(String(b.attachment_id||''),String(b.id||'')).first();if(!a||!await env.BUCKET!.head(a.id))throw Error('400:Comprovante indisponível');}return json(await financialOperation(db(),u,b));}
 else if(action==='access'){if(u.role!=='owner'||b.id===u.id)throw Error('403:Alteração não permitida');const target:any=await db().prepare('SELECT * FROM users WHERE id=?').bind(field(b,'id')).first();if(!target)throw Error('403:Alteração não permitida');if(target.role==='owner'&&b.confirm_owner!==true)throw Error('Confirme explicitamente a alteração de acesso do proprietário.');q=db().prepare('UPDATE users SET active=? WHERE id=?').bind(b.active?1:0,target.id);await db().batch([q,log(u,'user.access',target.id,target,{active:!!b.active})]);return json({ok:true});}
 else throw Error('Operação não suportada');await db().batch([q,log(u,action+'.create',id,null,{...b,action:undefined})]);return json({ok:true,id});}catch(e){return fail(e);}}

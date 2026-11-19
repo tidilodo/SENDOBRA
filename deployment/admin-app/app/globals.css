@@ -131,3 +131,13 @@ button:focus-visible,a:focus-visible,.upload:focus-within{outline:2px solid #427
  .wa-sidebar-status button{width:44px;height:44px}
  aside nav,aside .aside-bottom{order:2}
 }
+
+.mobile-expense{display:none}
+@media(max-width:760px){
+ .mobile-expense{display:block;padding:18px;margin-bottom:16px}
+ .mobile-expense form,.mobile-expense fieldset,.mobile-expense-files{display:grid;gap:12px}
+ .mobile-expense fieldset{min-width:0;border:0;padding:0;margin:0}
+ .mobile-expense label{display:grid;gap:5px}
+ .mobile-expense input,.mobile-expense select,.mobile-expense button{min-height:44px;max-width:100%}
+ .mobile-expense input,.mobile-expense select{font-size:16px}
+}
