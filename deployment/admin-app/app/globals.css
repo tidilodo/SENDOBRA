@@ -141,3 +141,26 @@ button:focus-visible,a:focus-visible,.upload:focus-within{outline:2px solid #427
  .mobile-expense input,.mobile-expense select,.mobile-expense button{min-height:44px;max-width:100%}
  .mobile-expense input,.mobile-expense select{font-size:16px}
 }
+
+.mobile-tabs{display:none}
+@media(max-width:760px){
+ html,body{overflow-x:clip;overscroll-behavior-x:none}
+ .admin-shell,.admin-shell .workspace,.admin-shell main{width:100%;max-width:100%;min-width:0}
+ .admin-shell aside{position:sticky;top:0;z-index:5;width:100%}
+ .admin-shell aside nav [data-test-nav]{display:none}
+ .admin-shell main{padding:16px 14px calc(88px + env(safe-area-inset-bottom))}
+ .admin-shell .admin-home .title-row,.admin-shell .desktop-overview,.admin-shell .admin-home footer{display:none}
+ .admin-shell .workspace>header{display:none}
+ .admin-shell .mobile-expense{margin:0}
+ .admin-shell .mobile-expense img{max-width:100%;height:auto;border-radius:8px}
+ .admin-shell .mobile-expense-files{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .admin-shell .mobile-expense-files label{padding:10px;border:1px solid #dde3e6;border-radius:10px;overflow-wrap:anywhere}
+ .admin-shell .mobile-expense-files input{width:100%;font-size:12px!important}
+ .admin-shell .mobile-expense .primary{width:100%;justify-content:center;margin-top:4px}
+ .admin-shell .mobile-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));position:fixed;inset:auto 0 0;z-index:6;background:#fff;border-top:1px solid #dde3e6;padding:4px 6px max(4px,env(safe-area-inset-bottom));gap:4px}
+ .admin-shell .mobile-tabs button{flex-direction:column;justify-content:center;gap:4px;min-width:0;border:0;border-radius:9px;background:transparent;padding:5px 2px;font-size:12px}
+ .admin-shell .mobile-tabs button[aria-current="page"]{background:#e5f2e9;color:#215840;font-weight:700}
+}
+.archived-works{margin-top:16px}
+.archived-works summary{cursor:pointer;font-weight:700}
+.archived-works>div{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:12px}
