@@ -6,5 +6,6 @@ declare namespace Cloudflare {
     BACKUP_EXPORT_SECRET?: string;
     VERCEL_BRIDGE_SECRET?: string;
     VERCEL_TEST_USER_EMAIL?: string;
+    ZAPIOBRA_SUPERADMIN_USER_ID?: string;
   }
 }
