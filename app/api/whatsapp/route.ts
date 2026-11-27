@@ -5,6 +5,24 @@ import {groupAccess,projectDraft} from '../../group-domain.mjs';
 import {validateEvent,parseEvent,verifySignature} from '../../whatsapp-domain.mjs';
 export const dynamic='force-dynamic';
 const json=(b:any,s=200)=>Response.json(b,{status:s,headers:{'Cache-Control':'no-store'}});
+
+// In-memory rate limiting per group/sender on Worker instance
+const webhookRateLimits = new Map<string, { count: number; resetAt: number }>();
+
+function checkWebhookRateLimit(key: string, limit = 60, windowMs = 60000): boolean {
+  const now = Date.now();
+  const entry = webhookRateLimits.get(key);
+  if (!entry || entry.resetAt < now) {
+    webhookRateLimits.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= limit) {
+    return false;
+  }
+  entry.count += 1;
+  return true;
+}
+
 export async function POST(r:Request){
  if(!env.WHATSAPP_INGEST_SECRET)return json({error:'Integração não configurada'},503);
  try{
@@ -13,6 +31,12 @@ export async function POST(r:Request){
  if(!await verifySignature(env.WHATSAPP_INGEST_SECRET,raw,r.headers.get('x-sendobra-timestamp'),r.headers.get('x-sendobra-signature')))return json({error:'Assinatura inválida'},401);
  const b:any=JSON.parse(raw),db=env.DB!,now=new Date().toISOString();
  if(b.event==='connection'){if(!['connecting','connected','disconnected','pairing_required'].includes(b.state))return json({error:'Estado inválido'},400);await db.prepare('INSERT INTO whatsapp_connection VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state, updated=excluded.updated').bind('primary',b.state,now).run();return json({ok:true});}
+
+ const rateKey = (b.group || 'unknown') + ':' + (b.sender || 'unknown');
+ if (!checkWebhookRateLimit(rateKey, 60, 60000)) {
+   return json({error:'Taxa de eventos excedida para este grupo. Aguarde um minuto.'}, 429);
+ }
+
  const queued:any=b.queue_job===b.group+':'+b.id?await db.prepare("SELECT id FROM ingestion_jobs WHERE id=? AND lease=? AND status='processing' AND lease_until>?").bind(b.queue_job,String(b.queue_lease||''),Date.now()).first():null;
  const e=validateEvent(b,!!queued),access=await groupAccess(db,e.group,e.sender);if(!access)return json({error:'Grupo ou remetente não autorizado'},403);const {group,user:u}=access;
  const flow=b.expense_flow===1||group.mode==='project';
